@@ -54,6 +54,7 @@ import Mathlib.Logic.Basic
 import Mathlib.Logic.Function.Basic
 import Mathlib.Logic.Nonempty
 import Mathlib.Mathport.Attributes
+import Mathlib.Mathport.MathportTest
 import Mathlib.Mathport.Rename
 import Mathlib.Mathport.SpecialNames
 import Mathlib.Mathport.Syntax
