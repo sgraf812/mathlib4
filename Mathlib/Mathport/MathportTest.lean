@@ -72,7 +72,7 @@ def compareGoal (expectedLCtx : LocalContext)
           match expectedDecl.value? with
           | none => pure none
           | some val =>
-            return some $ ← instantiateMVars $ subst.apply $
+            pure $ some $ ← instantiateMVars $ subst.apply $
               ← instantiateMVars val
 
         if actualName != expectedName || actualType != expectedType ||
@@ -83,7 +83,7 @@ def compareGoal (expectedLCtx : LocalContext)
       let actualTarget ← instantiateMVars $ ← getMVarType actualGoal
       let expectedTarget ←
         instantiateMVars $ subst.apply $ ← instantiateMVars expectedTarget
-      if actualTarget != expectedTarget then
+      if ← isDefEq actualTarget expectedTarget then
         return m!"expected target '{expectedTarget}' but got '{actualTarget}'"
 
       return none
