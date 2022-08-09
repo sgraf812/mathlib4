@@ -80,8 +80,9 @@ def compareGoal (expectedLCtx : LocalContext)
           return m!"expected hypothesis '{printHyp expectedName expectedType expectedVal?}' but got '{printHyp actualName actualType actualVal?}'"
         subst := subst.insert expectedFVarId (mkFVar actualFVarId)
 
-      let actualTarget ← instantiateMVars (← getMVarType actualGoal)
-      let expectedTarget := subst.apply (← instantiateMVars expectedTarget)
+      let actualTarget ← instantiateMVars $ ← getMVarType actualGoal
+      let expectedTarget ←
+        instantiateMVars $ subst.apply $ ← instantiateMVars expectedTarget
       if actualTarget != expectedTarget then
         return m!"expected target '{expectedTarget}' but got '{actualTarget}'"
 
