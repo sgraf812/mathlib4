@@ -60,8 +60,8 @@ def compareGoal (expectedLCtx : LocalContext)
         let expectedDecl ← withLCtx expectedLCtx expectedLocalInstances $
           getLocalDecl expectedFVarId
 
-        let actualName := actualDecl.userName
-        let expectedName := expectedDecl.userName
+        let actualName := actualDecl.userName.eraseMacroScopes
+        let expectedName := expectedDecl.userName.eraseMacroScopes
 
         let actualType ← instantiateMVars actualDecl.type
         let expectedType ← instantiateMVars $
@@ -83,12 +83,14 @@ def compareGoal (expectedLCtx : LocalContext)
       let actualTarget ← instantiateMVars $ ← getMVarType actualGoal
       let expectedTarget ←
         instantiateMVars $ subst.apply $ ← instantiateMVars expectedTarget
-      if ← isDefEq actualTarget expectedTarget then
+      trace[debug] "expected: {toString expectedTarget}"
+      trace[debug] "actual: {toString actualTarget}"
+      unless ← isDefEq actualTarget expectedTarget do
         return m!"expected target '{expectedTarget}' but got '{actualTarget}'"
 
       return none
     else
-      return "expected {expectedFVarIds.size} hypotheses but got {actualFVarIds.size}"
+      return m!"expected {expectedFVarIds.size} hypotheses but got {actualFVarIds.size}"
   where
     printHyp (userName : Name) (type : Expr) (value? : Option Expr) :
         MessageData :=
@@ -119,5 +121,13 @@ elab "#mathport_test " ppLine preGoals:(goal ppLine)+ tac:tactic ppLine postGoal
           err m!"mismatch in goal {i + 1}: {msg}"
     else
       err m!"expected {expectedPostGoals.size} goals, but got {actualPostGoals.size}"
+
+universe u
+
+set_option pp.all true in
+#mathport_test
+  { α : Type u, l : List α ⊢ Option α }
+  (cases l; constructor; apply some)
+  { α : Type u, head : α, tail : List α ⊢ α }
 
 end Mathlib.Prelude.MathportTest
