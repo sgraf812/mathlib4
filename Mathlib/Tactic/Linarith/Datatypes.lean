@@ -6,6 +6,10 @@ Authors: Robert Y. Lewis
 import Lean
 import Mathlib.Lean.Expr.Basic
 import Mathlib.Algebra.GroupWithZero.Defs
+import Mathlib.Tactic.Linarith.Lemmas
+import Mathlib.Tactic.Ring
+import Mathlib.Mathport.Syntax
+import Qq
 
 /-!
 # Datatypes for `linarith`
@@ -121,6 +125,8 @@ terms. -/
 inductive Ineq : Type
 | eq | le | lt
 
+instance : DecidableEq Ineq := sorry
+
 namespace Ineq
 
 /--
@@ -208,7 +214,7 @@ def Comp.cmp : Comp → Comp → Ordering
 A `Comp` represents a contradiction if its expression has no coefficients and its strength is <,
 that is, it represents the fact `0 < 0`.
  -/
-def Comp.isContr (c : Comp) : Bool := c.coeffs.isEmpty ∧ c.str = Ineq.lt
+def Comp.isContr (c : Comp) : Bool := c.coeffs.isEmpty && c.str = Ineq.lt
 
 instance Comp.ToFormat : ToFormat Comp :=
   ⟨fun p => format p.coeffs ++ toString p.str ++ "0"⟩
@@ -312,7 +318,7 @@ open Meta
 
 /-- A configuration object for `linarith`. -/
 structure LinarithConfig : Type 2 :=
-(discharger : TacticM Unit) -- FIXME Use ring as the default
+(discharger : TacticM Unit := do evalTactic (←`(tactic| ring))) -- TODO There should be a def for this?
 (restrict_type : Option Type := none)
 -- FIXME err... do we need this?
 -- (restrict_type_reflect : reflected _ restrict_type . tactic.apply_instance)
@@ -330,7 +336,8 @@ since this is typically needed when using stronger unification.
 -/
 def LinarithConfig.update_reducibility (cfg : LinarithConfig) (reduce_default : Bool) :
     LinarithConfig :=
-  if reduce_default then { cfg with transparency := .default, discharger := sorry } -- Use `ring!`
+  if reduce_default then
+    { cfg with transparency := .default, discharger := do evalTactic (←`(tactic| ring!)) }
   else cfg
 
 /-!
@@ -356,15 +363,17 @@ match e.getAppFnArgs with
 | (``GT.gt, #[a, b]) => return (a, b)
 | _ => throwError "Not a comparison"
 
+open Qq
+
 /--
 `parse_into_comp_and_expr e` checks if `e` is of the form `t < 0`, `t ≤ 0`, or `t = 0`.
 If it is, it returns the comparison along with `t`.
- -/
-def parse_into_comp_and_expr : Expr → Option (Ineq × Expr) := sorry
--- | `(%%e < 0) := (ineq.lt, e)
--- | `(%%e ≤ 0) := (ineq.le, e)
--- | `(%%e = 0) := (ineq.eq, e)
--- | _ := none
+-/
+def parse_into_comp_and_expr : Q(Prop) → MetaM (Option (Ineq × Expr))
+| ~q($e < 0) => return some (Ineq.lt, e)
+| ~q($e ≤ 0) => return some (Ineq.le, e)
+| ~q($e = 0) => return some (Ineq.eq, e)
+| _ => return none
 
 /--
 `mk_single_comp_zero_pf c h` assumes that `h` is a proof of `t R 0`.
@@ -374,7 +383,7 @@ If `c = 1`, `h'` is the same as `h` -- specifically, it does *not* change the ty
 -/
 def mk_single_comp_zero_pf (c : Nat) (h : Expr) : TacticM (Ineq × Expr) := do
   let tp ← inferType h
-  let some (iq, e) := parse_into_comp_and_expr tp | throwError "invalid comparison: {h} : {tp}"
+  let some (iq, e) ← parse_into_comp_and_expr tp | throwError "invalid comparison: {h} : {tp}"
   if c = 0 then do
     let e' ← mkAppM ``zero_mul #[e]
     return (Ineq.eq, e')
