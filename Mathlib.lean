@@ -14,6 +14,7 @@ import Mathlib.Data.Equiv.Functor
 import Mathlib.Data.Fin.Basic
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Fintype.Basic
+import Mathlib.Data.HashMap
 import Mathlib.Data.KVMap
 import Mathlib.Data.List.Basic
 import Mathlib.Data.List.Card
