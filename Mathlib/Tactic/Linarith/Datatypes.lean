@@ -8,7 +8,7 @@ import Mathlib.Lean.Expr.Basic
 import Mathlib.Algebra.GroupWithZero.Defs
 import Mathlib.Tactic.Linarith.Lemmas
 import Mathlib.Tactic.Ring
-import Mathlib.Tactic.SynthesizeUsing
+import Mathlib.Util.SynthesizeUsing
 import Mathlib.Mathport.Syntax
 import Qq
 
