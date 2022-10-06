@@ -393,8 +393,7 @@ def mk_single_comp_zero_pf (c : Nat) (h : Expr) : TacticM (Ineq × Expr) := do
   else if c = 1 then return (iq, h)
   else do
     let tp ← inferType (← get_rel_sides (← inferType h)).2
-    -- FIXME oops, we need to convert `c` to `tp` here.
-    let cpos ← mkAppM ``GT.gt #[toExpr c, toExpr 0]
+    let cpos ← mkAppM ``GT.gt #[(← tp.ofNat c), (← tp.ofNat 0)]
     let ex ← synthesizeUsing cpos (do evalTactic (←`(tactic| norm_num; done)))
     let e' ← mkAppM iq.to_const_mul_nm #[h, ex]
     return (iq, e')
