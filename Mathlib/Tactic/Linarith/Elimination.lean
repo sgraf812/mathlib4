@@ -60,10 +60,10 @@ For example, suppose `cs` is produced by scaling assumption 2 by 5,
 and adding to that the sum of assumptions 1 and 2.
 `cs.flatten` maps `1 ↦ 1, 2 ↦ 6`.
  -/
-def CompSource.flatten : CompSource → HashMap Nat Nat
-| (CompSource.assump n) => mkHashMap.insert n 1
+def CompSource.flatten : CompSource → Std.HashMap Nat Nat
+| (CompSource.assump n) => Std.HashMap.empty.insert n 1
 | (CompSource.add c1 c2) => (CompSource.flatten c1).add (CompSource.flatten c2)
-| (CompSource.scale n c) => (CompSource.flatten c).map (fun v => v * n)
+| (CompSource.scale n c) => (CompSource.flatten c).mapVal (fun _ v => v * n)
 
 -- FIXME everything below is just copy-paste from mathlib3
 
