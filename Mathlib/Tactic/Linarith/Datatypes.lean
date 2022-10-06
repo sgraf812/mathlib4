@@ -8,6 +8,7 @@ import Mathlib.Lean.Expr.Basic
 import Mathlib.Algebra.GroupWithZero.Defs
 import Mathlib.Tactic.Linarith.Lemmas
 import Mathlib.Tactic.Ring
+import Mathlib.Tactic.SynthesizeUsing
 import Mathlib.Mathport.Syntax
 import Qq
 
@@ -125,7 +126,8 @@ terms. -/
 inductive Ineq : Type
 | eq | le | lt
 
-instance : DecidableEq Ineq := sorry
+instance : DecidableEq Ineq :=
+fun a b => by cases a <;> cases b <;> simp <;> exact inferInstance
 
 namespace Ineq
 
@@ -158,9 +160,10 @@ def toString : Ineq → String
 /-- Finds the name of a multiplicative lemma corresponding to an inequality strength. -/
 -- FIXME
 def to_const_mul_nm : Ineq → Name
-| lt => ``mul_neg
-| le => ``mul_nonpos
-| eq => ``mul_eq
+| _ => sorry
+-- | lt => ``mul_neg
+-- | le => ``mul_nonpos
+-- | eq => ``mul_eq
 
 
 instance : ToString Ineq := ⟨toString⟩
@@ -390,7 +393,8 @@ def mk_single_comp_zero_pf (c : Nat) (h : Expr) : TacticM (Ineq × Expr) := do
   else if c = 1 then return (iq, h)
   else do
     let tp ← inferType (← get_rel_sides (← inferType h)).2
+    -- FIXME oops, we need to convert `c` to `tp` here.
     let cpos ← mkAppM ``GT.gt #[toExpr c, toExpr 0]
-    let (_, ex) ← solve_aux cpos sorry -- `[norm_num, done]
+    let ex ← synthesizeUsing cpos (do evalTactic (←`(tactic| norm_num; done)))
     let e' ← mkAppM iq.to_const_mul_nm #[h, ex]
     return (iq, e')
