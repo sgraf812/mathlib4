@@ -40,12 +40,12 @@ namespace Linarith
 /-!
 ### Datatypes
 
-The `comp_source` and `pcomp` datatypes are specific to the FM elimination routine;
+The `CompSource` and `PComp` datatypes are specific to the FM elimination routine;
 they are not shared with other components of `linarith`.
 -/
 
 /--
-`comp_source` tracks the source of a comparison.
+`CompSource` tracks the source of a comparison.
 The atomic source of a comparison is an assumption, indexed by a natural number.
 Two comparisons can be added to produce a new comparison,
 and one comparison can be scaled by a natural number to produce a new comparison.
@@ -69,7 +69,7 @@ def CompSource.flatten : CompSource → HashMap Nat Nat
 | (CompSource.add c1 c2) => (CompSource.flatten c1).add (CompSource.flatten c2)
 | (CompSource.scale n c) => (CompSource.flatten c).mapVal (fun _ v => v * n)
 
-/-- Formats a `comp_source` for printing. -/
+/-- Formats a `CompSource` for printing. -/
 def CompSource.toString : CompSource → String
 | (CompSource.assump e) => ToString.toString e
 | (CompSource.add c1 c2) => CompSource.toString c1 ++ " + " ++ CompSource.toString c2
@@ -113,13 +113,13 @@ structure PComp : Type :=
 /--
 Any comparison whose history is not minimal is redundant,
 and need not be included in the new set of comparisons.
-`elimed_ge : ℕ` is a natural number such that all variables with index ≥ `elimed_ge` have been
+`elimedGE : ℕ` is a natural number such that all variables with index ≥ `elimedGE` have been
 removed from the system.
 
 This test is an overapproximation to minimality. It gives necessary but not sufficient conditions.
-If the history of `c` is minimal, then `c.maybe_minimal` is true,
-but `c.maybe_minimal` may also be true for some `c` with minimal history.
-Thus, if `c.maybe_minimal` is false, `c` is known not to be minimal and must be redundant.
+If the history of `c` is minimal, then `c.maybeMinimal` is true,
+but `c.maybeMinimal` may also be true for some `c` with minimal history.
+Thus, if `c.maybeMinimal` is false, `c` is known not to be minimal and must be redundant.
 See http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.51.493&rep=rep1&type=pdf p.13
 (Theorem 7).
 The condition described there considers only implicitly eliminated variables that have been
@@ -130,12 +130,10 @@ variable. Consider eliminating `z` from `{x + y + z < 0, x - y - z < 0}`. The re
 This implementation of Fourier-Motzkin elimination processes variables in decreasing order of
 indices. Immediately after a step that eliminates variable `k`, variable `k'` has been eliminated
 iff `k' ≥ k`. Thus we can compute the intersection of officially and implicitly eliminated variables
-by taking the set of implicitly eliminated variables with indices ≥ `elimed_ge`.
+by taking the set of implicitly eliminated variables with indices ≥ `elimedGE`.
 -/
-def PComp.maybe_minimal (c : PComp) (elimed_ge : ℕ) : Bool :=
-  c.history.size ≤ 1 + ((c.implicit.filter (· ≥ elimed_ge)).union c.effective).size
-
--- FIXME everything below is just copy-paste from mathlib3
+def PComp.maybeMinimal (c : PComp) (elimedGE : ℕ) : Bool :=
+  c.history.size ≤ 1 + ((c.implicit.filter (· ≥ elimedGE)).union c.effective).size
 
 /--
 The `src : CompSource` field is ignored when comparing `PComp`s. Two `PComp`s proving the same
@@ -148,9 +146,9 @@ def PComp.scale (c : PComp) (n : ℕ) : PComp :=
   {c with c := c.c.scale n, src := c.src.scale n}
 
 /--
-`PComp.add c1 c2 elim_var` creates the result of summing the linear comparisons `c1` and `c2`,
-during the process of eliminating the variable `elim_var`.
-The computation assumes, but does not enforce, that `elim_var` appears in both `c1` and `c2`
+`PComp.add c1 c2 elimVar` creates the result of summing the linear comparisons `c1` and `c2`,
+during the process of eliminating the variable `elimVar`.
+The computation assumes, but does not enforce, that `elimVar` appears in both `c1` and `c2`
 and does not appear in the sum.
 Computing the sum of the two comparisons is easy; the complicated details lie in tracking the
 additional fields of `PComp`.
@@ -158,17 +156,17 @@ additional fields of `PComp`.
 * We recompute the variables that appear in `c1 + c2` from the newly created `Linexp`,
   since some may have been implicitly eliminated.
 * The effectively eliminated variables of `c1 + c2` are the union of the two effective sets,
-  with `elim_var` inserted.
+  with `elimVar` inserted.
 * The implicitly eliminated variables of `c1 + c2` are those that appear in at least one of
-  `c1.vars` and `c2.vars` but not in `(c1 + c2).vars`, excluding `elim_var`.
+  `c1.vars` and `c2.vars` but not in `(c1 + c2).vars`, excluding `elimVar`.
 -/
-def PComp.add (c1 c2 : PComp) (elim_var : ℕ) : PComp :=
+def PComp.add (c1 c2 : PComp) (elimVar : ℕ) : PComp :=
   let c := c1.c.add c2.c
   let src := c1.src.add c2.src
   let history := c1.history.union c2.history
   let vars := .ofList c.vars
-  let effective := (c1.effective.union c2.effective).insert elim_var
-  let implicit := ((c1.vars.union c2.vars).sdiff vars).erase elim_var
+  let effective := (c1.effective.union c2.effective).insert elimVar
+  let implicit := ((c1.vars.union c2.vars).sdiff vars).erase elimVar
   ⟨c, src, history, effective, implicit, vars⟩
 
 /--
@@ -190,16 +188,11 @@ instance PComp.ToFormat : ToFormat PComp :=
 
 abbrev PCompSet := RBSet PComp PComp.cmp
 
-/-- Creates an empty set of `PComp`s, backed by a red-black map, sorted using `PComp.cmp`.
-We use this for performance reasons. -/
--- FIXME inline?
-def mkPCompSet : PCompSet := RBSet.empty
-
 /-! ### Elimination procedure -/
 
 /-- If `c1` and `c2` both contain variable `a` with opposite coefficients,
 produces `v1` and `v2` such that `a` has been cancelled in `v1*c1 + v2*c2`. -/
-def elim_var (c1 c2 : Comp) (a : ℕ) : Option (ℕ × ℕ) :=
+def elimVar (c1 c2 : Comp) (a : ℕ) : Option (ℕ × ℕ) :=
 let v1 := c1.coeff_of a
 let v2 := c2.coeff_of a
 if v1 * v2 < 0 then
@@ -210,12 +203,12 @@ if v1 * v2 < 0 then
 else none
 
 /--
-`pelim_var p1 p2` calls `elim_var` on the `Comp` components of `p1` and `p2`.
+`pelimVar p1 p2` calls `elimVar` on the `Comp` components of `p1` and `p2`.
 If this returns `v1` and `v2`, it creates a new `PComp` equal to `v1*p1 + v2*p2`,
 and tracks this in the `CompSource`.
 -/
-def pelim_var (p1 p2 : PComp) (a : ℕ) : Option PComp := do
-  let (n1, n2) ← elim_var p1.c p2.c a
+def pelimVar (p1 p2 : PComp) (a : ℕ) : Option PComp := do
+  let (n1, n2) ← elimVar p1.c p2.c a
   return (p1.scale n1).add (p2.scale n2) a
 
 /--
@@ -224,113 +217,116 @@ A `PComp` represents a contradiction if its `Comp` field represents a contradict
 def PComp.isContr (p : PComp) : Bool := p.c.isContr
 
 /--
-`elim_with_set a p comps` collects the result of calling `pelim_var p p' a`
+`elimWithSet a p comps` collects the result of calling `pelimVar p p' a`
 for every `p' ∈ comps`.
 -/
-def elim_with_set (a : ℕ) (p : PComp) (comps : PCompSet) : PCompSet :=
+def elimWithSet (a : ℕ) (p : PComp) (comps : PCompSet) : PCompSet :=
 comps.foldl (fun s pc =>
-match pelim_var p pc a with
-| some pc => if pc.maybe_minimal a then s.insert pc else s
+match pelimVar p pc a with
+| some pc => if pc.maybeMinimal a then s.insert pc else s
 | none => s) RBSet.empty
 
 /--
 The state for the elimination monad.
-* `max_var`: the largest variable index that has not been eliminated.
+* `maxVar`: the largest variable index that has not been eliminated.
 * `comps`: a set of comparisons
 
 The elimination procedure proceeds by eliminating variable `v` from `comps` progressively
 in decreasing order.
 -/
 structure LinarithData : Type :=
-  (max_var : ℕ)
+  (maxVar : ℕ)
   (comps : PCompSet)
 
 /--
-The linarith monad extends an exceptional monad with a `linarith_structure` state.
-An exception produces a contradictory `pcomp`.
+The linarith monad extends an exceptional monad with a `LinarithData` state.
+An exception produces a contradictory `PComp`.
 -/
-@[reducible, derive [monad, monad_except pcomp]] meta def linarith_monad : Type → Type :=
-state_t linarith_structure (except_t pcomp id)
+-- FIXME derive [Monad, MonadExcept PComp]
+@[reducible] def LinarithM : Type → Type :=
+StateT LinarithData (ExceptT PComp Id)
+
+instance : Monad LinarithM := inferInstance
+instance : MonadExcept PComp LinarithM := inferInstance
 
 /-- Returns the current max variable. -/
-meta def get_max_var : linarith_monad ℕ :=
-linarith_structure.max_var <$> get
+def getMaxVar : LinarithM ℕ :=
+LinarithData.maxVar <$> get
 
 /-- Return the current comparison set. -/
-meta def get_comps : linarith_monad (rb_set pcomp) :=
-linarith_structure.comps <$> get
+def getPCompSet : LinarithM PCompSet :=
+LinarithData.comps <$> get
 
-/-- Throws an exception if a contradictory `pcomp` is contained in the current state. -/
-meta def validate : linarith_monad unit :=
-do ⟨_, comps⟩ ← get,
-match comps.to_list.find (λ p : pcomp, p.is_contr) with
-| none := return ()
-| some c := throw c
-end
+/-- Throws an exception if a contradictory `PComp` is contained in the current state. -/
+def validate : LinarithM Unit := do
+  match (←getPCompSet).toList.find? (fun p : PComp => p.isContr) with
+  | none => return ()
+  | some c => throw c
 
 /--
 Updates the current state with a new max variable and comparisons,
 and calls `validate` to check for a contradiction.
 -/
-meta def update (max_var : ℕ) (comps : rb_set pcomp) : linarith_monad unit :=
-state_t.put ⟨max_var, comps⟩ >> validate
+def update (maxVar : ℕ) (comps : PCompSet) : LinarithM Unit := do
+  StateT.set ⟨maxVar, comps⟩
+  validate
 
 /--
-`split_set_by_var_sign a comps` partitions the set `comps` into three parts.
+`splitSetByVarSign a comps` partitions the set `comps` into three parts.
 * `pos` contains the elements of `comps` in which `a` has a positive coefficient.
 * `neg` contains the elements of `comps` in which `a` has a negative coefficient.
-* `not_present` contains the elements of `comps` in which `a` has coefficient 0.
+* `notPresent` contains the elements of `comps` in which `a` has coefficient 0.
 
-Returns `(pos, neg, not_present)`.
+Returns `(pos, neg, notPresent)`.
 -/
-meta def split_set_by_var_sign (a : ℕ) (comps : rb_set pcomp) :
-  rb_set pcomp × rb_set pcomp × rb_set pcomp :=
-comps.fold ⟨mk_pcomp_set, mk_pcomp_set, mk_pcomp_set⟩ $ λ pc ⟨pos, neg, not_present⟩,
-  let n := pc.c.coeff_of a in
-  if n > 0 then ⟨pos.insert pc, neg, not_present⟩
-  else if n < 0 then ⟨pos, neg.insert pc, not_present⟩
-  else ⟨pos, neg, not_present.insert pc⟩
+def splitSetByVarSign (a : ℕ) (comps : PCompSet) :
+  PCompSet × PCompSet × PCompSet :=
+comps.foldl (fun ⟨pos, neg, notPresent⟩ pc =>
+  let n := pc.c.coeff_of a
+  if n > 0 then ⟨pos.insert pc, neg, notPresent⟩
+  else if n < 0 then ⟨pos, neg.insert pc, notPresent⟩
+  else ⟨pos, neg, notPresent.insert pc⟩)
+  ⟨RBSet.empty, RBSet.empty, RBSet.empty⟩
 
 /--
-`monad.elim_var a` performs one round of Fourier-Motzkin elimination, eliminating the variable `a`
+`elimVarM a` performs one round of Fourier-Motzkin elimination, eliminating the variable `a`
 from the `linarith` state.
 -/
-meta def monad.elim_var (a : ℕ) : linarith_monad unit :=
-do vs ← get_max_var,
-   when (a ≤ vs) $
-do ⟨pos, neg, not_present⟩ ← split_set_by_var_sign a <$> get_comps,
-   let cs' := pos.fold not_present (λ p s, s.union (elim_with_set a p neg)),
-   update (vs - 1) cs'
+def elimVarM (a : ℕ) : LinarithM Unit := do
+  let vs ← getMaxVar
+  if (a ≤ vs) then (do
+    let ⟨pos, neg, notPresent⟩ ← splitSetByVarSign a <$> getPCompSet
+    let cs' := pos.foldl (fun s p => s.union (elimWithSet a p neg)) notPresent
+    update (vs - 1) cs')
+  else
+    pure ()
 
 /--
-`elim_all_vars` eliminates all variables from the linarith state, leaving it with a set of
+`elimAllVarsM` eliminates all variables from the linarith state, leaving it with a set of
 ground comparisons. If this succeeds without exception, the original `linarith` state is consistent.
 -/
-meta def elim_all_vars : linarith_monad unit :=
-do mv ← get_max_var,
-   (list.range $ mv + 1).reverse.mmap' monad.elim_var
+def elimAllVarsM : LinarithM Unit := do
+  let mv ← getMaxVar
+  for i in (List.range $ mv + 1).reverse do
+    elimVarM i
 
 /--
-`mk_linarith_structure hyps vars` takes a list of hypotheses and the largest variable present in
+`mkLinarithData hyps vars` takes a list of hypotheses and the largest variable present in
 those hypotheses. It produces an initial state for the elimination monad.
 -/
-meta def mk_linarith_structure (hyps : list comp) (max_var : ℕ) : linarith_structure :=
-let pcomp_list : list pcomp := hyps.enum.map $ λ ⟨n, cmp⟩, pcomp.assump cmp n,
-    pcomp_set := rb_set.of_list_core mk_pcomp_set pcomp_list in
-⟨max_var, pcomp_set⟩
+def mkLinarithData (hyps : List Comp) (maxVar : ℕ) : LinarithData :=
+⟨maxVar, .ofList (hyps.enum.map $ fun ⟨n, cmp⟩ => PComp.assump cmp n)⟩
 
 /--
-`produce_certificate hyps vars` tries to derive a contradiction from the comparisons in `hyps`
-by eliminating all variables ≤ `max_var`.
+`produceCertificate hyps vars` tries to derive a contradiction from the comparisons in `hyps`
+by eliminating all variables ≤ `maxVar`.
 If successful, it returns a map `coeff : ℕ → ℕ` as a certificate.
 This map represents that we can find a contradiction by taking the sum  `∑ (coeff i) * hyps[i]`.
 -/
-meta def fourier_motzkin.produce_certificate : certificate_oracle :=
-λ hyps max_var,
-let state := mk_linarith_structure hyps max_var in
-match except_t.run (state_t.run (validate >> elim_all_vars) state) with
-| (except.ok (a, _)) := tactic.failed
-| (except.error contr) := return contr.src.flatten
-end
+def FourierMotzkin.produceCertificate : CertificateOracle :=
+fun hyps maxVar => match ExceptT.run
+    (StateT.run (do validate; elimAllVarsM : LinarithM Unit) (mkLinarithData hyps maxVar)) with
+| (Except.ok _) => failure
+| (Except.error contr) => return contr.src.flatten
 
-end linarith
+end Linarith

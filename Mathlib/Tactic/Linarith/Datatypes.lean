@@ -21,6 +21,8 @@ We split them into their own file.
 This file also contains a few convenient auxiliary functions.
 -/
 
+-- TODO finish snake casing
+
 open Lean Elab Tactic
 
 initialize registerTraceClass `Tactic.linarith
@@ -315,22 +317,22 @@ The default `CertificateOracle` used by `linarith` is
 `linarith.fourier_motzkin.produce_certificate`.
 -/
 def CertificateOracle : Type :=
-  List Comp → Nat → TacticM (HashMap Nat Nat)
+  List Comp → Nat → TacticM (Std.HashMap Nat Nat)
 
 open Meta
 
 /-- A configuration object for `linarith`. -/
 structure LinarithConfig : Type 2 :=
-(discharger : TacticM Unit := do evalTactic (←`(tactic| ring))) -- TODO There should be a def for this?
-(restrict_type : Option Type := none)
--- FIXME err... do we need this?
--- (restrict_type_reflect : reflected _ restrict_type . tactic.apply_instance)
-(exfalso : Bool := true)
-(transparency : TransparencyMode := .reducible)
-(split_hypotheses : Bool := true)
-(split_ne : Bool := false)
-(preprocessors : Option (List GlobalBranchingPreprocessor) := none)
-(oracle : Option CertificateOracle := none)
+  (discharger : TacticM Unit := do evalTactic (←`(tactic| ring))) -- TODO There should be a def for this?
+  (restrict_type : Option Type := none)
+  -- FIXME err... do we need this?
+  -- (restrict_type_reflect : reflected _ restrict_type . tactic.apply_instance)
+  (exfalso : Bool := true)
+  (transparency : TransparencyMode := .reducible)
+  (split_hypotheses : Bool := true)
+  (split_ne : Bool := false)
+  (preprocessors : Option (List GlobalBranchingPreprocessor) := none)
+  (oracle : Option CertificateOracle := none)
 
 /--
 `cfg.update_reducibility reduce_default` will change the transparency setting of `cfg` to
@@ -358,13 +360,13 @@ This function is more naturally in the `Option` monad, but it is convenient to p
 for compositionality.
  -/
 def get_rel_sides (e : Expr) : TacticM (Expr × Expr) :=
-match e.getAppFnArgs with
-| (``LT.lt, #[a, b]) => return (a, b)
-| (``LE.le, #[a, b]) => return (a, b)
-| (``Eq, #[a, b]) => return (a, b)
-| (``GE.ge, #[a, b]) => return (a, b)
-| (``GT.gt, #[a, b]) => return (a, b)
-| _ => throwError "Not a comparison"
+  match e.getAppFnArgs with
+  | (``LT.lt, #[a, b]) => return (a, b)
+  | (``LE.le, #[a, b]) => return (a, b)
+  | (``Eq, #[a, b]) => return (a, b)
+  | (``GE.ge, #[a, b]) => return (a, b)
+  | (``GT.gt, #[a, b]) => return (a, b)
+  | _ => throwError "Not a comparison"
 
 open Qq
 
