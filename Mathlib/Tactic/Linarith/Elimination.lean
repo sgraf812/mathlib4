@@ -49,11 +49,11 @@ The atomic source of a comparison is an assumption, indexed by a natural number.
 Two comparisons can be added to produce a new comparison,
 and one comparison can be scaled by a natural number to produce a new comparison.
  -/
--- FIXME @[derive inhabited]
 inductive CompSource : Type
 | assump : Nat → CompSource
 | add : CompSource → CompSource → CompSource
 | scale : Nat → CompSource → CompSource
+deriving Inhabited
 
 /--
 Given a `CompSource` `cs`, `cs.flatten` maps an assumption index
@@ -242,12 +242,8 @@ structure LinarithData : Type :=
 The linarith monad extends an exceptional monad with a `LinarithData` state.
 An exception produces a contradictory `PComp`.
 -/
--- FIXME derive [Monad, MonadExcept PComp]
 @[reducible] def LinarithM : Type → Type :=
 StateT LinarithData (ExceptT PComp Id)
-
-instance : Monad LinarithM := inferInstance
-instance : MonadExcept PComp LinarithM := inferInstance
 
 /-- Returns the current max variable. -/
 def getMaxVar : LinarithM ℕ :=

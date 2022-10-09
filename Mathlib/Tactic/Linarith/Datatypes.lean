@@ -124,12 +124,9 @@ end Linexp
 
 /-- The three-element type `Ineq` is used to represent the strength of a comparison between
 terms. -/
--- FIXME derive `DecidableEq` and `Inhabited`
 inductive Ineq : Type
 | eq | le | lt
-
-instance : DecidableEq Ineq :=
-fun a b => by cases a <;> cases b <;> simp <;> exact inferInstance
+deriving DecidableEq, Inhabited
 
 namespace Ineq
 
@@ -183,10 +180,10 @@ Index 0 is reserved for constants, i.e. `coeffs.find 0` is the coefficient of 1.
 The represented term is `coeffs.sum (λ ⟨k, v⟩, v * Var[k])`.
 str determines the strength of the comparison -- is it < 0, ≤ 0, or = 0?
 -/
--- FIXME derive `Inhabited`
 structure Comp : Type :=
   (str : Ineq)
   (coeffs : Linexp)
+deriving Inhabited
 
 /-- `c.vars` returns the list of variables that appear in the linear expression contained in `c`. -/
 def Comp.vars : Comp → List Nat := Linexp.vars ∘ Comp.coeffs
