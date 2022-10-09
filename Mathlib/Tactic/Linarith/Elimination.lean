@@ -4,7 +4,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Robert Y. Lewis
 -/
 
-import Mathlib.Data.HashSet
 import Mathlib.Data.RBSet
 import Mathlib.Tactic.Linarith.Datatypes
 
@@ -66,7 +65,8 @@ and adding to that the sum of assumptions 1 and 2.
  -/
 def CompSource.flatten : CompSource → HashMap Nat Nat
 | (CompSource.assump n) => HashMap.empty.insert n 1
-| (CompSource.add c1 c2) => (CompSource.flatten c1).add (CompSource.flatten c2)
+| (CompSource.add c1 c2) =>
+    (CompSource.flatten c1).mergeWith (fun _ b b' => b + b') (CompSource.flatten c2)
 | (CompSource.scale n c) => (CompSource.flatten c).mapVal (fun _ v => v * n)
 
 /-- Formats a `CompSource` for printing. -/
@@ -77,7 +77,7 @@ def CompSource.toString : CompSource → String
 
 instance CompSource.ToFormat : ToFormat CompSource :=
   ⟨fun a => CompSource.toString a⟩
-
+#check Ordering
 /--
 A `PComp` stores a linear comparison `Σ cᵢ*xᵢ R 0`,
 along with information about how this comparison was derived.
@@ -105,10 +105,10 @@ sets. During the variable elimination process, a `PComp` with non-minimal histor
 structure PComp : Type :=
   (c : Comp)
   (src : CompSource)
-  (history : HashSet ℕ)
-  (effective : HashSet ℕ)
-  (implicit : HashSet ℕ)
-  (vars : HashSet ℕ)
+  (history : RBSet ℕ Ord.compare)
+  (effective : RBSet ℕ Ord.compare)
+  (implicit : RBSet ℕ Ord.compare)
+  (vars : RBSet ℕ Ord.compare)
 
 /--
 Any comparison whose history is not minimal is redundant,
@@ -164,9 +164,9 @@ def PComp.add (c1 c2 : PComp) (elimVar : ℕ) : PComp :=
   let c := c1.c.add c2.c
   let src := c1.src.add c2.src
   let history := c1.history.union c2.history
-  let vars := .ofList c.vars
+  let vars := .ofList c.vars _
   let effective := (c1.effective.union c2.effective).insert elimVar
-  let implicit := ((c1.vars.union c2.vars).sdiff vars).erase elimVar
+  let implicit := ((c1.vars.union c2.vars).sdiff vars).erase (Ord.compare elimVar)
   ⟨c, src, history, effective, implicit, vars⟩
 
 /--
@@ -178,10 +178,10 @@ No variables have been eliminated (effectively or implicitly).
 def PComp.assump (c : Comp) (n : ℕ) : PComp :=
 { c := c,
   src := CompSource.assump n,
-  history := HashSet.empty.insert n,
+  history := RBSet.empty.insert n,
   effective := .empty,
   implicit := .empty,
-  vars := .ofList c.vars }
+  vars := .ofList c.vars _ }
 
 instance PComp.ToFormat : ToFormat PComp :=
   ⟨fun p => format p.c.coeffs ++ toString p.c.str ++ "0"⟩
@@ -315,7 +315,7 @@ def elimAllVarsM : LinarithM Unit := do
 those hypotheses. It produces an initial state for the elimination monad.
 -/
 def mkLinarithData (hyps : List Comp) (maxVar : ℕ) : LinarithData :=
-⟨maxVar, .ofList (hyps.enum.map $ fun ⟨n, cmp⟩ => PComp.assump cmp n)⟩
+⟨maxVar, .ofList (hyps.enum.map $ fun ⟨n, cmp⟩ => PComp.assump cmp n) _⟩
 
 /--
 `produceCertificate hyps vars` tries to derive a contradiction from the comparisons in `hyps`

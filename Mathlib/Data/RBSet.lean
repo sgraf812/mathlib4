@@ -6,41 +6,23 @@ Authors: Scott Morrison
 import Std.Data.RBMap
 
 /-!
-# `RBSet α` is implemented as `RBMap α Unit`
-
-This is a minimal-effort implementation until it is done properly in `Std`.
+# `RBSet α`
 -/
 
 namespace Std
 
-/--
-An red-black tree backed set, implemented as `RBSet α := RBMap α Unit`.
-It is parameterised by the ordering function for elements.
--/
-def RBSet (α : Type _) (cmp : α → α → Ordering) := RBMap α Unit cmp
 
 namespace RBSet
 
 variable {α : Type _} {cmp : α → α → Ordering}
 
-/-- Construct an empty red-black set. -/
-def empty : RBSet α cmp := RBMap.empty
+instance : Membership α (RBSet α cmp) := ⟨fun a f => f.contains a⟩
+instance {a : α} {s : RBSet α cmp} : Decidable (a ∈ s) := sorry
 
-/-- Fold a function over a red-black set. -/
-def foldl (self : RBSet α cmp) (f : β → α → β) (b : β) : β :=
-  RBMap.foldl (fun b a _ => f b a) b self
+/-- `s.filter p` returns the subset of the set `s` satisfying the predicate `p`. -/
+def filter (self : RBSet α cmp) (p : α → Bool) : RBSet α cmp :=
+  .ofList (self.toList.filter p) _
 
-/-- Construct a `RBSet` from a `List`, ignoring duplicates. -/
-def ofList (L : List α) : RBSet α cmp :=
-  RBMap.ofList (L.map (⟨·, ()⟩)) cmp
-
-/-- Insert an element into a red-black set. -/
-def insert (self : RBSet α cmp) (a : α) : RBSet α cmp := RBMap.insert self a ()
-
-/-- Convert a red-black set to a list, with the elements appearing in order parameterising
-the red-black set. -/
-def toList (self : RBSet α comp) : List α := RBMap.toList self |>.map (·.1)
-
-/-- Combine the elements of two `RBSet`s. -/
-def union (f g : RBSet α cmp) : RBSet α cmp :=
-  f.foldl (·.insert ·) g
+/-- `sdiff s t` returns the set of elements that are in `s` but not in `t`. -/
+def sdiff (s t : RBSet α cmp) : RBSet α cmp :=
+  s.filter (· ∉ t)
