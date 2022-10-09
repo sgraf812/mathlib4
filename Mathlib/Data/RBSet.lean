@@ -22,9 +22,6 @@ namespace RBSet
 
 variable {α : Type _} {cmp : α → α → Ordering}
 
--- instance : Membership α (RBSet α cmp) := ⟨fun a f => f.contains a⟩
--- instance {a : α} {s : RBSet α cmp} : Decidable (a ∈ s) := sorry
-
 def empty : RBSet α cmp := RBMap.empty
 
 def foldl (self : RBSet α cmp) (f : β → α → β) (b : β) : β :=
@@ -38,14 +35,6 @@ def insert (self : RBSet α cmp) (a : α) : RBSet α cmp := RBMap.insert self a 
 
 def toList (self : RBSet α comp) : List α := RBMap.toList self |>.map (·.1)
 
--- /-- Select only elements of a `RBSet` satisfying a predicate. -/
--- def filter (self : RBSet α cmp) (p : α → Bool) : RBSet α cmp :=
---   self.filterKeys p
-
 /-- Combine the elements of two `RBSet`s. -/
 def union (f g : RBSet α cmp) : RBSet α cmp :=
   f.foldl (·.insert ·) g
-
--- /-- `sdiff f g` returns the set of elements that are in `f` but not in `g`. -/
--- def sdiff (f g : RBSet α cmp) : RBSet α cmp :=
---   f.filter (· ∉ g)
