@@ -30,14 +30,14 @@ initialize registerTraceClass `Tactic.linarith
 namespace Linarith
 
 /-- A shorthand for tracing when the `trace.Tactic.linarith` option is set to true. -/
-def linarith_trace {α} [ToMessageData α] (s : α) : CoreM Unit := do
+def linarithTrace {α} [ToMessageData α] (s : α) : CoreM Unit := do
   trace[linarith] "{s}"
 
 /--
 A shorthand for tracing the types of a list of proof terms
 when the `trace.Tactic.linarith` option is set to true.
 -/
-def linarith_trace_proofs (s : String := "") (l : List Expr) : MetaM Unit := do
+def linarithTraceProofs (s : String := "") (l : List Expr) : MetaM Unit := do
   trace[linarith] s
   trace[linarith] (← l.mapM Meta.inferType)
 
@@ -157,12 +157,10 @@ def toString : Ineq → String
 | lt => "<"
 
 /-- Finds the name of a multiplicative lemma corresponding to an inequality strength. -/
--- FIXME
-def to_const_mul_nm : Ineq → Name
-| _ => sorry
--- | lt => ``mul_neg
--- | le => ``mul_nonpos
--- | eq => ``mul_eq
+def toConstMulName : Ineq → Name
+| lt => ``mul_neg
+| le => ``mul_nonpos
+| eq => ``mul_eq
 
 
 instance : ToString Ineq := ⟨toString⟩
@@ -287,10 +285,10 @@ def GlobalBranchingPreprocessor.process (pp : GlobalBranchingPreprocessor)
   (l : List Expr) : TacticM (List Branch) := do
   let branches ← pp.transform l
   if (branches.length > 1) then
-    linarith_trace (format "Preprocessing: {pp.name} has branched, with branches:")
+    linarithTrace (format "Preprocessing: {pp.name} has branched, with branches:")
   for ⟨goal, hyps⟩ in branches do
     setGoals [goal]
-    linarith_trace_proofs (toString (format "Preprocessing: {pp.name}")) hyps
+    linarithTraceProofs (toString (format "Preprocessing: {pp.name}")) hyps
   return branches
 
 instance PreprocessorToGlobalBranchingPreprocessor :
@@ -332,11 +330,11 @@ structure LinarithConfig : Type 2 :=
   (oracle : Option CertificateOracle := none)
 
 /--
-`cfg.update_reducibility reduce_default` will change the transparency setting of `cfg` to
+`cfg.updateReducibility reduce_default` will change the transparency setting of `cfg` to
 `default` if `reduce_default` is true. In this case, it also sets the discharger to `ring!`,
 since this is typically needed when using stronger unification.
 -/
-def LinarithConfig.update_reducibility (cfg : LinarithConfig) (reduce_default : Bool) :
+def LinarithConfig.updateReducibility (cfg : LinarithConfig) (reduce_default : Bool) :
     LinarithConfig :=
   if reduce_default then
     { cfg with transparency := .default, discharger := do evalTactic (←`(tactic| ring!)) }
@@ -351,12 +349,12 @@ These functions are used by multiple modules, so we put them here for accessibil
 open tactic
 
 /--
-`get_rel_sides e` returns the left and right hand sides of `e` if `e` is a comparison,
+`getRelSides e` returns the left and right hand sides of `e` if `e` is a comparison,
 and fails otherwise.
 This function is more naturally in the `Option` monad, but it is convenient to put in `TacticM`
 for compositionality.
  -/
-def get_rel_sides (e : Expr) : TacticM (Expr × Expr) :=
+def getRelSides (e : Expr) : TacticM (Expr × Expr) :=
   match e.getAppFnArgs with
   | (``LT.lt, #[a, b]) => return (a, b)
   | (``LE.le, #[a, b]) => return (a, b)
@@ -368,31 +366,31 @@ def get_rel_sides (e : Expr) : TacticM (Expr × Expr) :=
 open Qq
 
 /--
-`parse_into_comp_and_expr e` checks if `e` is of the form `t < 0`, `t ≤ 0`, or `t = 0`.
+`parseCompAndExpr e` checks if `e` is of the form `t < 0`, `t ≤ 0`, or `t = 0`.
 If it is, it returns the comparison along with `t`.
 -/
-def parse_into_comp_and_expr : Q(Prop) → MetaM (Option (Ineq × Expr))
+def parseCompAndExpr : Q(Prop) → MetaM (Option (Ineq × Expr))
 | ~q($e < 0) => return some (Ineq.lt, e)
 | ~q($e ≤ 0) => return some (Ineq.le, e)
 | ~q($e = 0) => return some (Ineq.eq, e)
 | _ => return none
 
 /--
-`mk_single_comp_zero_pf c h` assumes that `h` is a proof of `t R 0`.
+`mkSingleCompZeroOf c h` assumes that `h` is a proof of `t R 0`.
 It produces a pair `(R', h')`, where `h'` is a proof of `c*t R' 0`.
 Typically `R` and `R'` will be the same, except when `c = 0`, in which case `R'` is `=`.
 If `c = 1`, `h'` is the same as `h` -- specifically, it does *not* change the type to `1*t R 0`.
 -/
-def mk_single_comp_zero_pf (c : Nat) (h : Expr) : TacticM (Ineq × Expr) := do
+def mkSingleCompZeroOf (c : Nat) (h : Expr) : TacticM (Ineq × Expr) := do
   let tp ← inferType h
-  let some (iq, e) ← parse_into_comp_and_expr tp | throwError "invalid comparison: {h} : {tp}"
+  let some (iq, e) ← parseCompAndExpr tp | throwError "invalid comparison: {h} : {tp}"
   if c = 0 then do
     let e' ← mkAppM ``zero_mul #[e]
     return (Ineq.eq, e')
   else if c = 1 then return (iq, h)
   else do
-    let tp ← inferType (← get_rel_sides (← inferType h)).2
+    let tp ← inferType (← getRelSides (← inferType h)).2
     let cpos ← mkAppM ``GT.gt #[(← tp.ofNat c), (← tp.ofNat 0)]
     let ex ← synthesizeUsing cpos (do evalTactic (←`(tactic| norm_num; done)))
-    let e' ← mkAppM iq.to_const_mul_nm #[h, ex]
+    let e' ← mkAppM iq.toConstMulName #[h, ex]
     return (iq, e')
