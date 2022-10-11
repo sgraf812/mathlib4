@@ -369,11 +369,19 @@ open Qq
 `parseCompAndExpr e` checks if `e` is of the form `t < 0`, `t ≤ 0`, or `t = 0`.
 If it is, it returns the comparison along with `t`.
 -/
-def parseCompAndExpr : Q(Prop) → MetaM (Ineq × Expr)
-| ~q($e < 0) => return (Ineq.lt, e)
-| ~q($e ≤ 0) => return (Ineq.le, e)
-| ~q($e = 0) => return (Ineq.eq, e)
-| e => throwError "invalid comparison: {e}"
+-- FIXME this isn't checking the RHS is zero.
+def parseCompAndExpr (e : Expr) : MetaM (Ineq × Expr) :=
+  match e.getAppFnArgs with
+  | (``LT.lt, #[e, _]) => return (Ineq.lt, e)
+  | (``LE.le, #[e, _]) => return (Ineq.le, e)
+  | (``Eq, #[e, _]) => return (Ineq.eq, e)
+  | _ => throwError "invalid comparison: {e}"
+-- TODO It would be nice to use `QQ`, but it assumes `0 : ℕ`.
+-- def parseCompAndExpr : Q(Prop) → MetaM (Ineq × Expr)
+-- | ~q($e < 0) => return (Ineq.lt, e)
+-- | ~q($e ≤ 0) => return (Ineq.le, e)
+-- | ~q($e = 0) => return (Ineq.eq, e)
+-- | e => throwError "invalid comparison: {e}"
 
 /--
 `mkSingleCompZeroOf c h` assumes that `h` is a proof of `t R 0`.

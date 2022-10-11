@@ -138,7 +138,7 @@ def mk_neg_eq_zero_pf (e : Expr) : MetaM Expr := do
 -/
 def prove_eq_zero_using (tac : TacticM Unit) (e : Expr) : TermElabM Expr := do
   let ⟨u, α, e⟩ ← inferTypeQ' e
-  let h : Q(Zero $α) ← synthInstanceQ q(Zero $α)
+  let h : Q(Zero $α) ← synthInstanceQ q(Zero $α) -- FIXME I don't know how to avoid this warning!
   synthesizeUsing q($e = 0) tac
 
 /--
