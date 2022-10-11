@@ -17,7 +17,7 @@
    "name": "Unicode",
    "inputRev": "main"},
   {"url": "https://github.com/leanprover/std4",
-   "rev": "b3590e627717a7d7b981924fa7b1ae0527a7627e",
+   "rev": "840b791d5333c5a00425e01344ba86aac555185d",
    "name": "std",
    "inputRev": "main"},
   {"url": "https://github.com/gebner/quote4",

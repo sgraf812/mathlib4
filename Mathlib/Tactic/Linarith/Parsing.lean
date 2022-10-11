@@ -50,7 +50,8 @@ def Monom.one : Monom := RBMap.empty
 
 /-- Compare monomials by first comparing their keys and then their powers. -/
 def Monom.lt : Monom → Monom → Bool :=
-fun a b => (a.keys < b.keys) || ((a.keys = b.keys) && (a.values < b.values))
+fun a b =>
+  ((a.keys : List ℕ) < b.keys) || (((a.keys : List ℕ) = b.keys) && ((a.values : List ℕ) < b.values))
 
 instance : Ord Monom where
   compare x y := if x.lt y then .lt else if x = y then .eq else .gt
@@ -67,7 +68,7 @@ s.foldr (fun m' coeff sm => sm.insert (m + m') coeff) RBMap.empty
 
 /-- `sum.mul s1 s2` distributes the multiplication of two sums.` -/
 def Sum.mul (s1 s2 : Sum) : Sum :=
-s1.foldr (fun mn coeff sm => sm + ((s2.scaleByMonom mn).mapVal (· * coeff))) RBMap.empty
+s1.foldr (fun mn coeff sm => sm + ((s2.scaleByMonom mn).mapVal (fun _ v => v * coeff))) RBMap.empty
 
 /-- The `n`th power of `s : Sum` is the `n`-fold product of `s`, with `s.pow 0 = Sum.one`. -/
 def Sum.pow (s : Sum) : ℕ → Sum
@@ -147,10 +148,10 @@ partial def linearFormOfExpr (red : TransparencyMode) (m : ExprMap)
 | ~q($e1 - $e2) => do
     let (m1, comp1) ← linearFormOfExpr red m inst e1
     let (m2, comp2) ← linearFormOfExpr red m1 inst e2
-    return (m2, comp1 + comp2.mapVal (-·))
+    return (m2, comp1 + comp2.mapVal (fun _ v => -v))
 | ~q(-$e) => do
     let (m1, comp) ← linearFormOfExpr red m inst e
-    return (m1, comp.mapVal (-·))
+    return (m1, comp.mapVal (fun _ v => -v))
 | ~q($e ^ ($n : ℕ)) => do
     let (m1, comp) ← linearFormOfExpr red m inst e
     return (m1, comp.pow n.natLit!)
