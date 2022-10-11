@@ -191,7 +191,7 @@ Both of these are updated during processing and returned.
 -/
 def toComp (red : TransparencyMode) (e : Expr) (e_map : ExprMap) (monom_map : Map Monom ℕ) :
     MetaM (Comp × ExprMap × Map Monom ℕ) := do
-  let some (iq, e) ← parseCompAndExpr e | failure
+  let (iq, e) ← parseCompAndExpr e
   let ⟨u, α, e⟩ ← inferTypeQ' e
   let inst : Q(Add $α) ← synthInstanceQ q(Add $α)
   let (m', comp') ← linearFormOfExpr red e_map inst e

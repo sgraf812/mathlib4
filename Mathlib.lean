@@ -28,6 +28,7 @@ import Mathlib.Data.Nat.Basic
 import Mathlib.Data.Option.Basic
 import Mathlib.Data.Option.Defs
 import Mathlib.Data.Prod
+import Mathlib.Data.RBMap
 import Mathlib.Data.String.Defs
 import Mathlib.Data.String.Lemmas
 import Mathlib.Data.Subtype
@@ -91,6 +92,7 @@ import Mathlib.Tactic.LibrarySearch
 import Mathlib.Tactic.Linarith.Lemmas
 import Mathlib.Tactic.Linarith.Datatypes
 import Mathlib.Tactic.Linarith.Elimination
+import Mathlib.Tactic.Linarith.Parsing
 import Mathlib.Tactic.NormCast
 import Mathlib.Tactic.NormCast.Tactic
 import Mathlib.Tactic.NormNum

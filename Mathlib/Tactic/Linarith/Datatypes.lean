@@ -302,14 +302,14 @@ instance GlobalPreprocessorToGlobalBranchingPreprocessor :
 
 /--
 A `CertificateOracle` is a function
-`produce_certificate : List Comp → Nat → TacticM (HashMap Nat Nat)`.
-`produce_certificate hyps max_var` tries to derive a contradiction from the comparisons in `hyps`
+`produceCertificate : List Comp → Nat → TacticM (HashMap Nat Nat)`.
+`produceCertificate hyps max_var` tries to derive a contradiction from the comparisons in `hyps`
 by eliminating all variables ≤ `max_var`.
 If successful, it returns a map `coeff : Nat → Nat` as a certificate.
 This map represents that we can find a contradiction by taking the sum  `∑ (coeff i) * hyps[i]`.
 
 The default `CertificateOracle` used by `linarith` is
-`linarith.fourier_motzkin.produce_certificate`.
+`Linarith.FourierMotzkin.produceCertificate`.
 -/
 def CertificateOracle : Type :=
   List Comp → Nat → TacticM (Std.HashMap Nat Nat)
@@ -351,10 +351,10 @@ open tactic
 /--
 `getRelSides e` returns the left and right hand sides of `e` if `e` is a comparison,
 and fails otherwise.
-This function is more naturally in the `Option` monad, but it is convenient to put in `TacticM`
+This function is more naturally in the `Option` monad, but it is convenient to put in `MetaM`
 for compositionality.
  -/
-def getRelSides (e : Expr) : TacticM (Expr × Expr) :=
+def getRelSides (e : Expr) : MetaM (Expr × Expr) :=
   match e.getAppFnArgs with
   | (``LT.lt, #[a, b]) => return (a, b)
   | (``LE.le, #[a, b]) => return (a, b)
@@ -369,11 +369,11 @@ open Qq
 `parseCompAndExpr e` checks if `e` is of the form `t < 0`, `t ≤ 0`, or `t = 0`.
 If it is, it returns the comparison along with `t`.
 -/
-def parseCompAndExpr : Q(Prop) → MetaM (Option (Ineq × Expr))
-| ~q($e < 0) => return some (Ineq.lt, e)
-| ~q($e ≤ 0) => return some (Ineq.le, e)
-| ~q($e = 0) => return some (Ineq.eq, e)
-| _ => return none
+def parseCompAndExpr : Q(Prop) → MetaM (Ineq × Expr)
+| ~q($e < 0) => return (Ineq.lt, e)
+| ~q($e ≤ 0) => return (Ineq.le, e)
+| ~q($e = 0) => return (Ineq.eq, e)
+| e => throwError "invalid comparison: {e}"
 
 /--
 `mkSingleCompZeroOf c h` assumes that `h` is a proof of `t R 0`.
@@ -381,9 +381,9 @@ It produces a pair `(R', h')`, where `h'` is a proof of `c*t R' 0`.
 Typically `R` and `R'` will be the same, except when `c = 0`, in which case `R'` is `=`.
 If `c = 1`, `h'` is the same as `h` -- specifically, it does *not* change the type to `1*t R 0`.
 -/
-def mkSingleCompZeroOf (c : Nat) (h : Expr) : TacticM (Ineq × Expr) := do
+def mkSingleCompZeroOf (c : Nat) (h : Expr) : TermElabM (Ineq × Expr) := do
   let tp ← inferType h
-  let some (iq, e) ← parseCompAndExpr tp | throwError "invalid comparison: {h} : {tp}"
+  let (iq, e) ← parseCompAndExpr tp
   if c = 0 then do
     let e' ← mkAppM ``zero_mul #[e]
     return (Ineq.eq, e')
@@ -391,6 +391,6 @@ def mkSingleCompZeroOf (c : Nat) (h : Expr) : TacticM (Ineq × Expr) := do
   else do
     let tp ← inferType (← getRelSides (← inferType h)).2
     let cpos ← mkAppM ``GT.gt #[(← tp.ofNat c), (← tp.ofNat 0)]
-    let ex ← synthesizeUsing cpos (do evalTactic (←`(tactic| norm_num; done)))
+    let ex ← synthesizeUsing cpos (do evalTactic (←`(tactic| norm_num; done))) -- TODO There should be a def for this?
     let e' ← mkAppM iq.toConstMulName #[h, ex]
     return (iq, e')
