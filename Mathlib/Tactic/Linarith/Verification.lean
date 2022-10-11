@@ -19,6 +19,17 @@ This file implements the reconstruction.
 The public facing declaration in this file is `proveFalseByLinarith`.
 -/
 
+namespace Qq
+
+def ofNatQ (α : Q(Type $u)) (_ : Q(Semiring $α)) (n : ℕ) : Q($α) :=
+  have : Q(OfNat $α $n) := match n with
+  | 0 => (q(inferInstance) : Q(OfNat $α (nat_lit 0)))
+  | 1 => (q(inferInstance) : Q(OfNat $α (nat_lit 1)))
+  | _+2 => q(inferInstance)
+  q(OfNat.ofNat $n)
+
+end Qq
+
 namespace Linarith
 
 open Ineq Lean Elab Tactic Meta
@@ -27,44 +38,36 @@ open Ineq Lean Elab Tactic Meta
 
 open Qq
 
-
-example [Semiring α] (n : ℕ) : OfNat α n := inferInstance
-
-def ofNatQ' (α : Q(Type $u)) (n : Q(ℕ)) (_ : Q(OfNat $α $n)) : Q($α) := q(OfNat.ofNat $n)
-def ofNatQ (α : Q(Type $u)) (_ : Q(Semiring $α)) (n : ℕ) : Q($α) := ofNatQ' α (mkRawNatLit n) q(inferInstance)
-
-def mulExpr' (n : ℕ) {α : Q(Type $u)} (_ : Q(Semiring $α)) (e : Q($α)) : Q($α) :=
+/-- A typesafe version of `mulExpr`. -/
+def mulExpr' (n : ℕ) {α : Q(Type $u)} (inst : Q(Semiring $α)) (e : Q($α)) : Q($α) :=
 if n = 1 then e else
-  let n := ofNatQ α q(inferInstance) n
+  let n := ofNatQ α inst n
   q($n * $e)
 
+/--
+`mulExpr n e` creates an `Expr` representing `n*e`.
+When elaborated, the coefficient will be a native numeral of the same type as `e`.
+-/
 def mulExpr (n : ℕ) (e : Expr) : MetaM Expr := do
   let ⟨u, α, e⟩ ← inferTypeQ' e
   let inst : Q(Semiring $α) ← synthInstanceQ q(Semiring $α)
   return mulExpr' n inst e
 
-#eval do mulExpr 5 (← Expr.ofNat (mkConst `Nat) 7)
+/-- A type-safe analogue of `addExprs`. -/
+def addExprs' {α : Q(Type $u)} (inst : Q(AddMonoid $α)) : List Q($α) → Q($α)
+| []   => q(0)
+| [a]  => a
+| h::t => let t := addExprs' inst t; q($h + $t)
 
-/--
-`mul_expr n e` creates a `pexpr` representing `n*e`.
-When elaborated, the coefficient will be a native numeral of the same type as `e`.
--/
-def mul_expr (n : ℕ) (e : Expr) : Expr := sorry
--- if n = 1 then e else
--- ``(%%(nat.to_pexpr n) * %%e)
-
-private def add_exprs_aux : Expr → List Expr → Expr := sorry
--- | p [] := p
--- | p [a] := ``(%%p + %%a)
--- | p (h::t) := add_exprs_aux ``(%%p + %%h) t
-
-/--
-`add_exprs l` creates a `pexpr` representing the sum of the elements of `l`, associated left.
-If `l` is empty, it will be the `pexpr` 0. Otherwise, it does not include 0 in the sum.
--/
-def add_exprs : List Expr → pexpr := sorry
--- | [] := ``(0)
--- | (h::t) := add_exprs_aux h t
+/-- `addExprs L` creates an `Expr` representing the sum of the elements of `L`, associated right. -/
+-- FIXME does it actually matter that we associate right? In mathlib3 we associate left.
+def addExprs : List Expr → MetaM Expr
+| [] => return q(0) -- This may not be of the intended type; use with caution.
+| L@(h::_) => do
+  let ⟨u, α, _⟩ ← inferTypeQ' h
+  let inst : Q(AddMonoid $α) ← synthInstanceQ q(AddMonoid $α)
+  -- This is not type safe; we just assume all the `Expr`s in the tail have the same type:
+  return addExprs' inst L
 
 /--
 If our goal is to add together two inequalities `t1 R1 0` and `t2 R2 0`,
@@ -120,25 +123,23 @@ def ineq_prf_tp (prf : Expr) : MetaM Expr := do
 `mk_neg_one_lt_zero_pf tp` returns a proof of `-1 < 0`,
 where the numerals are natively of type `tp`.
 -/
-def mk_neg_one_lt_zero_pf (tp : Expr) : MetaM Expr :=
-sorry
--- do zero_lt_one ← mk_mapp `zero_lt_one [tp, none, none],
---    mk_app `neg_neg_of_pos [zero_lt_one]
+def mk_neg_one_lt_zero_pf (tp : Expr) : MetaM Expr := do
+  let zero_lt_one ← mkAppOptM `zero_lt_one #[tp, none, none]
+  mkAppM `neg_neg_of_pos #[zero_lt_one]
 
 /--
 If `e` is a proof that `t = 0`, `mk_neg_eq_zero_pf e` returns a proof that `-t = 0`.
 -/
-def mk_neg_eq_zero_pf (e : Expr) : MetaM Expr :=
-sorry
--- to_expr ``(neg_eq_zero.mpr %%e)
+def mk_neg_eq_zero_pf (e : Expr) : MetaM Expr := do
+  return mkAppN (← mkAppM `Iff.mpr #[mkConst `neg_eq_zero]) #[e]
 
 /--
 `prove_eq_zero_using tac e` tries to use `tac` to construct a proof of `e = 0`.
 -/
-def prove_eq_zero_using (tac : TacticM Unit) (e : Expr) : TermElabM Expr :=
-sorry
--- do tgt ← to_expr ``(%%e = 0),
---    prod.snd <$> solve_aux tgt (tac >> done)
+def prove_eq_zero_using (tac : TacticM Unit) (e : Expr) : TermElabM Expr := do
+  let ⟨u, α, e⟩ ← inferTypeQ' e
+  let h : Q(Zero $α) ← synthInstanceQ q(Zero $α)
+  synthesizeUsing q($e = 0) tac
 
 /--
 `add_neg_eq_pfs l` inspects the list of proofs `l` for proofs of the form `t = 0`. For each such
@@ -197,9 +198,9 @@ def proveFalseByLinarith (cfg : LinarithConfig) : List Expr → TacticM Expr
     let enum_inputs := inputs.enum
     -- construct a list pairing nonzero coeffs with the proof of their corresponding comparison
     let zip := enum_inputs.filterMap (fun ⟨n, e⟩ => (certificate.find? n).map (e, ·))
-    let mls ← zip.mapM (fun ⟨e, n⟩ => do return (mul_expr n (← term_of_ineq_prf e)))
+    let mls ← zip.mapM (fun ⟨e, n⟩ => do mulExpr n (← term_of_ineq_prf e))
     -- `sm` is the sum of input terms, scaled to cancel out all variables.
-    let sm := add_exprs mls -- FIXME there was a to_expr here previously
+    let sm ← addExprs mls -- FIXME there was a to_expr here previously
     linarithTrace "The expression\n  {sm}\nshould be both 0 and negative"
     -- we prove that `sm = 0`, typically with `ring`.
     let sm_eq_zero ← prove_eq_zero_using cfg.discharger sm
