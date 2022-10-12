@@ -22,7 +22,7 @@ This file also contains a few convenient auxiliary functions.
 
 -- TODO finish snake casing
 
-open Lean Elab Tactic
+open Lean Elab Tactic Meta
 
 initialize registerTraceClass `Tactic.linarith
 
@@ -38,7 +38,7 @@ when the `trace.Tactic.linarith` option is set to true.
 -/
 def linarithTraceProofs (s : String := "") (l : List Expr) : MetaM Unit := do
   trace[linarith] s
-  trace[linarith] (← l.mapM Meta.inferType)
+  trace[linarith] (← l.mapM inferType)
 
 /-! ### Linear expressions -/
 
@@ -225,7 +225,7 @@ instance Comp.ToFormat : ToFormat Comp :=
 
 /--
 A preprocessor transforms a proof of a proposition into a proof of a different propositon.
-The return type is `List Expr`, since some preprocessing steps may create multiple new hypotheses,
+The return type is `List FVarId`, since some preprocessing steps may create multiple new hypotheses,
 and some may remove a hypothesis from the list.
 A "no-op" preprocessor should return its input as a singleton list.
 -/
@@ -246,8 +246,7 @@ structure GlobalPreprocessor : Type :=
 Some preprocessors perform branching case splits. A `Branch` is used to track one of these case
 splits. The first component, an `MVarId`, is the goal corresponding to this branch of the split,
 given as a metavariable. The `List Expr` component is the list of hypotheses for `linarith`
-in this branch. Every `Expr` in this list should be type correct in the context of the associated
-goal.
+in this branch.
 -/
 def Branch : Type := MVarId × List Expr
 

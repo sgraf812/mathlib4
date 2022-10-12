@@ -238,6 +238,66 @@ open Linarith
 open Lean Elab Tactic Meta
 
 /--
+Run a tactic on all goals, and always succeeds.
+
+(This is parallel to `Lean.Elab.Tactic.evalAllGoals` in core,
+which takes a `Syntax` rather than `TacticM Unit`.
+This function could be moved to core and `evalAllGoals` refactored to use it.)
+-/
+def allGoals (tac : TacticM Unit) : TacticM Unit := do
+  let mvarIds ← getGoals
+  let mut mvarIdsNew := #[]
+  for mvarId in mvarIds do
+    unless (← mvarId.isAssigned) do
+      setGoals [mvarId]
+      try
+        tac
+        mvarIdsNew := mvarIdsNew ++ (← getUnsolvedGoals)
+      catch ex =>
+        if (← read).recover then
+          logException ex
+          mvarIdsNew := mvarIdsNew.push mvarId
+        else
+          throw ex
+  setGoals mvarIdsNew.toList
+
+
+-- def F (f : α → β → MetaM (γ × α)) (a : α) (bs : Array β) : MetaM (Array γ × α) := do
+--   let mut z := a
+--   let mut gs : Array γ := #[]
+--   for b in bs do
+--     let (g, a') ← f z b
+--     z := a'
+--     gs := gs.push g
+--   return (gs, z)
+
+-- #eval F (fun n m => return (n*m, n+1)) 0 #[1,2,3,4]
+
+-- def G (f : α → β → MetaM (γ × α)) : β → StateT α MetaM γ := fun b => do
+--   let (g, a) ← f (←get) b
+--   set a
+--   return g
+
+-- def F' (f : α → β → MetaM (γ × α)) (a : α) (bs : Array β) : MetaM (Array γ × α) := do
+--   StateT.run (bs.mapM (G f)) a
+
+-- #eval F' (fun n m => return (n+1, n*m)) 0 #[1,2,3,4] -- (#[0, 2, 6, 12], 4)
+
+/-- Asserts an expression as an anonymous hypothesis. -/
+def noteAnonymous (g : MVarId) (e : Expr) : MetaM (FVarId × MVarId) := do
+  (← g.assert .anonymous (←inferType e) e).intro1P
+
+/-- Asserts an array of expressions as anonymous hypotheses. -/
+def noteAllAnonymous (g : MVarId) (es : Array Expr) : MetaM (Array FVarId × MVarId) := do
+  let mut z := g
+  let mut fs : Array FVarId := Array.mkEmpty es.size
+  for e in es do
+    let (f, g') ← noteAnonymous z e
+    z := g'
+    fs := fs.push f
+  return (fs, z)
+
+/--
 `linarith reduce_semi only_on hyps cfg` tries to close the goal using linear arithmetic. It fails
 if it does not succeed at doing this.
 
@@ -247,7 +307,7 @@ expressions.
 * If `only_on` is true, the search will be restricted to `hyps`. Otherwise it will use all
   comparisons in the local context.
 -/
-def tactic.linarith (reduce_semi : Bool) (only_on : Bool) (hyps : Array Expr)
+partial def tactic.linarith (reduce_semi : Bool) (only_on : Bool) (hyps : List Expr)
   (cfg : LinarithConfig := {}) : TacticM Unit :=
 -- TODO make this better Lean4 style: lower the monads where possible, handle goals cleanly!
 do
@@ -255,13 +315,11 @@ do
   -- if the target is an equality, we run `linarith` twice, to prove ≤ and ≥.
   if t.isEq then do
     linarithTrace "target is an equality: splitting"
-    evalTactic (← `(apply eq_of_not_lt_of_not_gt))
-      -- FIXME <;> tactic.linarith
+    evalTactic (← `(tactic| apply eq_of_not_lt_of_not_gt))
+    allGoals <| tactic.linarith reduce_semi only_on hyps cfg
   else do
-    -- FIXME this doesn't handle goals correctly!!
-    let hyps ← hyps.mapM (fun e => do
-      (← (←getMainGoal).assert .anonymous (←inferType e) e).intro1P)
-    let hyps := hyps.map (·.2)
+    -- FIXME this step is unnecessary, right? There's no need to note expressions as hypotheses.
+    -- let (hyps, g) ← noteAllAnonymous (←getMainGoal) hyps
     if cfg.split_hypotheses then do
       linarithTrace "trying to split hypotheses"
       -- FIXME `auto.split_hyps` hasn't been ported.
@@ -276,14 +334,14 @@ do
     if pref_type_and_new_var_from_tgt.isNone then
       if cfg.exfalso then
         linarithTrace "using exfalso"
-        sorry -- FIXME exfalso
+        -- FIXME exfalso
       else throwError "linarith failed: target is not a valid comparison"
     let cfg := cfg.updateReducibility reduce_semi
     let (pref_type, new_var) :=
       pref_type_and_new_var_from_tgt.elim (none, none) (Prod.map some some)
     -- set up the list of hypotheses, considering the `only_on` and `restrict_type` options
-    let hyps ← if only_on then return sorry -- FIXME (new_var.toList ++ hyps)
-            else sorry -- (++ hyps) <$> local_context,
+    let hyps ← (if only_on then do return new_var.toList ++ hyps
+      else do return []) -- FIXME (++ hyps) <$> local_context,
     -- FIXME restore handling of restricting types:
     -- let hyps ← (do
     --   let t ← get_restrict_type cfg.restrict_type_reflect
@@ -322,7 +380,7 @@ Config options:
 elab_rules : tactic
   | `(tactic| linarith $[$cfg]? $[only%$o]? $[[$args,*]]?) => do
     tactic.linarith false o.isSome
-      (← ((args.map (TSepArray.getElems)).getD {}).mapM (elabTerm ·.raw none))
+      (← ((args.map (TSepArray.getElems)).getD {}).mapM (elabTerm ·.raw none)).toList
       (← elabLinarithConfig (mkOptionalNode cfg))
 
 -- FIXME We have to repeat all that just to handle the `!`?
@@ -330,7 +388,7 @@ elab_rules : tactic
 elab_rules : tactic
   | `(tactic| linarith! $[$cfg]? $[only%$o]? $[[$args,*]]?) => do
     tactic.linarith true o.isSome
-      (← ((args.map (TSepArray.getElems)).getD {}).mapM (elabTerm ·.raw none))
+      (← ((args.map (TSepArray.getElems)).getD {}).mapM (elabTerm ·.raw none)).toList
       (← elabLinarithConfig (mkOptionalNode cfg))
 
 -- add_hint_tactic "linarith"
