@@ -301,6 +301,12 @@ def allGoals (tac : TacticM Unit) : TacticM Unit := do
 --     fs := fs.push f
 --   return (fs, z)
 
+def getLocalHyps : MetaM (Array Expr) := do
+  let mut hs := #[]
+  for d in ← getLCtx do
+    if !d.isAuxDecl then hs := hs.push d.toExpr
+  return hs
+
 /--
 `linarith reduce_semi only_on hyps cfg` tries to close the goal using linear arithmetic. It fails
 if it does not succeed at doing this.
@@ -315,6 +321,7 @@ partial def tactic.linarith (reduce_semi : Bool) (only_on : Bool) (hyps : List E
   (cfg : LinarithConfig := {}) : TacticM Unit :=
 -- TODO make this better Lean4 style: lower the monads where possible, handle goals cleanly!
 do
+  linarithTrace "waking up"
   let t ← getMainTarget
   -- if the target is an equality, we run `linarith` twice, to prove ≤ and ≥.
   if t.isEq then do
@@ -325,7 +332,7 @@ do
     -- FIXME this step is unnecessary, right? There's no need to note expressions as hypotheses.
     -- let (hyps, g) ← noteAllAnonymous (←getMainGoal) hyps
     if cfg.split_hypotheses then do
-      -- linarithTrace "trying to split hypotheses"
+      linarithTrace "trying to split hypotheses"
       -- FIXME `auto.split_hyps` hasn't been ported.
       -- try auto.split_hyps
   /- If we are proving a comparison goal (and not just `false`), we consider the type of the
@@ -334,6 +341,11 @@ do
     In this case we also recieve a new variable from moving the goal to a hypothesis.
     Otherwise, there is no preferred type and no new variable; we simply change the goal to `false`.
   -/
+    linarithTrace "before apply_contr_lemma"
+    for f in ← getLCtx do
+      if !f.isAuxDecl then
+        linarithTrace (← inferType f.toExpr)
+
     -- TODO can we rename liftMetaTacticAux?
     -- TODO do this with a match
     let pref_type_and_new_var_from_tgt ← liftMetaTacticAux apply_contr_lemma
@@ -348,9 +360,15 @@ do
     let (pref_type, new_var) :=
       pref_type_and_new_var_from_tgt.elim (none, none) (Prod.map some some)
 
+    withMainContext do
+    linarithTrace "after apply_contr_lemma"
+    for f in ← getLCtx do
+      if !f.isAuxDecl then
+        linarithTrace (← inferType f.toExpr)
+
     -- set up the list of hypotheses, considering the `only_on` and `restrict_type` options
     let hyps ← (if only_on then do return new_var.toList ++ hyps
-      else do return (←getLCtx).getFVars.toList ++ hyps)
+      else do return (← getLocalHyps).toList ++ hyps)
 
     -- FIXME restore handling of restricting types:
     -- let hyps ← (do
@@ -396,7 +414,7 @@ elab_rules : tactic
 
 set_option trace.linarith true
 
-example (h : 1 < 0) : 3 < 7 := by
+example (h : 1 < 0) (g : 37 < 42) : 3 < 7 := by
   linarith [Nat.zero_lt_one]
   all_goals admit
 
@@ -404,6 +422,17 @@ example (h : 1 < 0) : 3 < 7 := by
 example (h : 1 < 0) : 3 = 7 := by
   linarith [Nat.zero_lt_one]
   all_goals admit
+
+initialize registerTraceClass `foo
+
+def foo : MetaM (List Bool) := do
+  return (← getLCtx).foldr (fun d L => d.isAuxDecl :: L) []
+
+elab "foo" : tactic => do
+  let L ← foo
+  dbg_trace L
+
+def bar (h : 0 < 1) (g : 37 < 42) : 3 < 7 := by foo
 
 -- FIXME We have to repeat all that just to handle the `!`?
 -- Copy doc-string?
