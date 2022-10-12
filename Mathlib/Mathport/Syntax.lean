@@ -24,6 +24,7 @@ import Mathlib.Tactic.InferParam
 import Mathlib.Tactic.Inhabit
 import Mathlib.Tactic.LeftRight
 import Mathlib.Tactic.LibrarySearch
+import Mathlib.Tactic.Linarith
 import Mathlib.Tactic.NormCast
 import Mathlib.Tactic.NormNum
 import Mathlib.Tactic.PushNeg
@@ -340,8 +341,6 @@ syntax nameAndTerm := term:71 " * " term:66
 /- M -/ syntax (name := linearCombination) "linear_combination" (config)?
   sepBy(atomic(nameAndTerm) <|> term:66, " + ") : tactic
 
-/- B -/ syntax (name := linarith) "linarith" (config)? (&" only")? (" [" term,* "]")? : tactic
-/- B -/ syntax (name := linarith!) "linarith!" (config)? (&" only")? (" [" term,* "]")? : tactic
 /- M -/ syntax (name := nlinarith) "nlinarith" (config)? (&" only")? (" [" term,* "]")? : tactic
 /- M -/ syntax (name := nlinarith!) "nlinarith!" (config)? (&" only")? (" [" term,* "]")? : tactic
 

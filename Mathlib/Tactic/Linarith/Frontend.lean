@@ -247,18 +247,25 @@ expressions.
 * If `only_on` is true, the search will be restricted to `hyps`. Otherwise it will use all
   comparisons in the local context.
 -/
-def tactic.linarith (reduce_semi : Bool) (only_on : Bool) (hyps : List Expr)
+def tactic.linarith (reduce_semi : Bool) (only_on : Bool) (hyps : Array Expr)
   (cfg : LinarithConfig := {}) : TacticM Unit :=
 -- TODO make this better Lean4 style: lower the monads where possible, handle goals cleanly!
 do
   let t ← getMainTarget
   -- if the target is an equality, we run `linarith` twice, to prove ≤ and ≥.
-  if t.is_eq.is_some then do
+  if t.isEq then do
     linarithTrace "target is an equality: splitting"
-    (applyc ``eq_of_not_lt_of_not_gt) <;> tactic.linarith
+    evalTactic (← `(apply eq_of_not_lt_of_not_gt))
+      -- FIXME <;> tactic.linarith
   else do
-    let hyps ← hyps.mmap $ fun e => i_to_expr e >>= note_anon none
-    when cfg.split_hypotheses (linarith_trace "trying to split hypotheses" >> try auto.split_hyps)
+    -- FIXME this doesn't handle goals correctly!!
+    let hyps ← hyps.mapM (fun e => do
+      (← (←getMainGoal).assert .anonymous (←inferType e) e).intro1P)
+    let hyps := hyps.map (·.2)
+    if cfg.split_hypotheses then do
+      linarithTrace "trying to split hypotheses"
+      -- FIXME `auto.split_hyps` hasn't been ported.
+      -- try auto.split_hyps
   /- If we are proving a comparison goal (and not just `false`), we consider the type of the
     elements in the comparison to be the "preferred" type. That is, if we find comparison
     hypotheses in multiple types, we will run `linarith` on the goal type first.
@@ -266,14 +273,16 @@ do
     Otherwise, there is no preferred type and no new variable; we simply change the goal to `false`.
   -/
     let pref_type_and_new_var_from_tgt ← apply_contr_lemma
-    when pref_type_and_new_var_from_tgt.is_none $
-      if cfg.exfalso then linarith_trace "using exfalso" >> exfalso
-      else fail "linarith failed: target is not a valid comparison"
+    if pref_type_and_new_var_from_tgt.isNone then
+      if cfg.exfalso then
+        linarithTrace "using exfalso"
+        sorry -- FIXME exfalso
+      else throwError "linarith failed: target is not a valid comparison"
     let cfg := cfg.updateReducibility reduce_semi
     let (pref_type, new_var) :=
-      pref_type_and_new_var_from_tgt.elim (none, none) (prod.map some some)
+      pref_type_and_new_var_from_tgt.elim (none, none) (Prod.map some some)
     -- set up the list of hypotheses, considering the `only_on` and `restrict_type` options
-    let hyps ← if only_on then return (new_var.elim [] singleton ++ hyps)
+    let hyps ← if only_on then return sorry -- FIXME (new_var.toList ++ hyps)
             else sorry -- (++ hyps) <$> local_context,
     -- FIXME restore handling of restricting types:
     -- let hyps ← (do
@@ -283,6 +292,13 @@ do
     linarithTraceProofs "linarith is running on the following hypotheses:" hyps
     run_linarith_on_pfs cfg hyps pref_type
 
+open Parser Tactic
+open Syntax
+
+syntax (name := linarith) "linarith" (config)? (&" only")? (" [" term,* "]")? : tactic
+syntax (name := linarith!) "linarith!" (config)? (&" only")? (" [" term,* "]")? : tactic
+
+declare_config_elab elabLinarithConfig LinarithConfig
 
 /--
 Tries to prove a goal of `false` by linear arithmetic on hypotheses.
@@ -303,14 +319,23 @@ Config options:
   Options: `ring2`, `ring SOP`, `simp`
 * `linarith {split_hypotheses := ff}` will not destruct conjunctions in the context.
 -/
-meta def tactic.interactive.linarith (red : parse ((tk "!")?))
-  (restr : parse ((tk "only")?)) (hyps : parse pexpr_list?)
-  (cfg : linarith_config := {}) : tactic unit :=
-tactic.linarith red.is_some restr.is_some (hyps.get_or_else []) cfg
+elab_rules : tactic
+  | `(tactic| linarith $[$cfg]? $[only%$o]? $[[$args,*]]?) => do
+    tactic.linarith false o.isSome
+      (← ((args.map (TSepArray.getElems)).getD {}).mapM (elabTerm ·.raw none))
+      (← elabLinarithConfig (mkOptionalNode cfg))
 
-add_hint_tactic "linarith"
+-- FIXME We have to repeat all that just to handle the `!`?
+-- Copy doc-string?
+elab_rules : tactic
+  | `(tactic| linarith! $[$cfg]? $[only%$o]? $[[$args,*]]?) => do
+    tactic.linarith true o.isSome
+      (← ((args.map (TSepArray.getElems)).getD {}).mapM (elabTerm ·.raw none))
+      (← elabLinarithConfig (mkOptionalNode cfg))
 
-/--
+-- add_hint_tactic "linarith"
+
+/-
 `linarith` attempts to find a contradiction between hypotheses that are linear (in)equalities.
 Equivalently, it can prove a linear inequality by assuming its negation and proving `false`.
 
@@ -361,13 +386,13 @@ A variant, `nlinarith`, does some basic preprocessing to handle some nonlinear g
 The option `set_option trace.linarith true` will trace certain intermediate stages of the `linarith`
 routine.
 -/
-add_tactic_doc
-{ name       := "linarith",
-  category   := doc_category.tactic,
-  decl_names := [`tactic.interactive.linarith],
-  tags       := ["arithmetic", "decision procedure", "finishing"] }
+-- add_tactic_doc
+-- { name       := "linarith",
+--   category   := doc_category.tactic,
+--   decl_names := [`tactic.interactive.linarith],
+--   tags       := ["arithmetic", "decision procedure", "finishing"] }
 
-/--
+/-
 An extension of `linarith` with some preprocessing to allow it to solve some nonlinear arithmetic
 problems. (Based on Coq's `nra` tactic.) See `linarith` for the available syntax of options,
 which are inherited by `nlinarith`; that is, `nlinarith!` and `nlinarith only [h1, h2]` all work as
@@ -379,17 +404,17 @@ in `linarith`. The preprocessing is as follows:
   the assumption `0 R' (b1 - a1) * (b2 - a2)` is added to the context (non-recursively),
   where `R ∈ {<, ≤, =}` is the appropriate comparison derived from `R1, R2`.
 -/
-meta def tactic.interactive.nlinarith (red : parse ((tk "!")?))
-  (restr : parse ((tk "only")?)) (hyps : parse pexpr_list?)
-  (cfg : linarith_config := {}) : tactic unit :=
-tactic.linarith red.is_some restr.is_some (hyps.get_or_else [])
-  { cfg with preprocessors := some $
-      cfg.preprocessors.get_or_else default_preprocessors ++ [nlinarith_extras] }
+-- meta def tactic.interactive.nlinarith (red : parse ((tk "!")?))
+--   (restr : parse ((tk "only")?)) (hyps : parse pexpr_list?)
+--   (cfg : linarith_config := {}) : tactic unit :=
+-- tactic.linarith red.is_some restr.is_some (hyps.get_or_else [])
+--   { cfg with preprocessors := some $
+--       cfg.preprocessors.get_or_else default_preprocessors ++ [nlinarith_extras] }
 
-add_hint_tactic "nlinarith"
+-- add_hint_tactic "nlinarith"
 
-add_tactic_doc
-{ name       := "nlinarith",
-  category   := doc_category.tactic,
-  decl_names := [`tactic.interactive.nlinarith],
-  tags       := ["arithmetic", "decision procedure", "finishing"] }
+-- add_tactic_doc
+-- { name       := "nlinarith",
+--   category   := doc_category.tactic,
+--   decl_names := [`tactic.interactive.nlinarith],
+--   tags       := ["arithmetic", "decision procedure", "finishing"] }

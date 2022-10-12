@@ -9,7 +9,6 @@ import Mathlib.Algebra.GroupWithZero.Defs
 import Mathlib.Tactic.Linarith.Lemmas
 import Mathlib.Tactic.Ring
 import Mathlib.Util.SynthesizeUsing
-import Mathlib.Mathport.Syntax
 import Qq
 
 /-!
@@ -317,9 +316,12 @@ def CertificateOracle : Type :=
 open Meta
 
 /-- A configuration object for `linarith`. -/
-structure LinarithConfig : Type 2 :=
+structure LinarithConfig : Type :=
   (discharger : TacticM Unit := do evalTactic (←`(tactic| ring))) -- TODO There should be a def for this?
-  (restrict_type : Option Type := none)
+  -- We can't actually store a `Type` here,
+  -- as we want `LinarithConfig : Type` rather than ` : Type 1`,
+  -- so that we can define `elabLinarithConfig : Lean.Syntax → Lean.Elab.TermElabM LinarithConfig`
+  (restrict_type : Option Syntax := none)
   -- FIXME err... do we need this?
   -- (restrict_type_reflect : reflected _ restrict_type . tactic.apply_instance)
   (exfalso : Bool := true)
@@ -337,7 +339,7 @@ since this is typically needed when using stronger unification.
 def LinarithConfig.updateReducibility (cfg : LinarithConfig) (reduce_default : Bool) :
     LinarithConfig :=
   if reduce_default then
-    { cfg with transparency := .default, discharger := do evalTactic (←`(tactic| ring!)) }
+    { cfg with transparency := .default, discharger := sorry /- do evalTactic (←`(tactic| ring!)) -/}
   else cfg
 
 /-!
