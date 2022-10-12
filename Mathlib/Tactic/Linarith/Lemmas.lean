@@ -20,4 +20,7 @@ theorem mul_eq {α} [OrderedSemiring α] {a b : α} (ha : a = 0) (_ : 0 < b) : b
 sorry
 -- by simp [*]
 
+lemma eq_of_not_lt_of_not_gt {α} [LinearOrder α] (a b : α) (h1 : ¬ a < b) (h2 : ¬ b < a) : a = b :=
+le_antisymm (le_of_not_gt h2) (le_of_not_gt h1)
+
 end Linarith

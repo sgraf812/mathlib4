@@ -24,7 +24,7 @@ This file also contains a few convenient auxiliary functions.
 
 open Lean Elab Tactic Meta
 
-initialize registerTraceClass `Tactic.linarith
+initialize registerTraceClass `linarith
 
 namespace Linarith
 
@@ -357,14 +357,12 @@ for compositionality.
  -/
 def getRelSides (e : Expr) : MetaM (Expr × Expr) :=
   match e.getAppFnArgs with
-  | (``LT.lt, #[a, b]) => return (a, b)
-  | (``LE.le, #[a, b]) => return (a, b)
-  | (``Eq, #[a, b]) => return (a, b)
-  | (``GE.ge, #[a, b]) => return (a, b)
-  | (``GT.gt, #[a, b]) => return (a, b)
+  | (``LT.lt, #[_, _, a, b]) => return (a, b)
+  | (``LE.le, #[_, _, a, b]) => return (a, b)
+  | (``Eq, #[_, a, b]) => return (a, b)
+  | (``GE.ge, #[_, _, a, b]) => return (a, b)
+  | (``GT.gt, #[_, _, a, b]) => return (a, b)
   | _ => throwError "Not a comparison"
-
-open Qq
 
 /--
 `parseCompAndExpr e` checks if `e` is of the form `t < 0`, `t ≤ 0`, or `t = 0`.
@@ -373,11 +371,13 @@ If it is, it returns the comparison along with `t`.
 -- FIXME this isn't checking the RHS is zero.
 def parseCompAndExpr (e : Expr) : MetaM (Ineq × Expr) :=
   match e.getAppFnArgs with
-  | (``LT.lt, #[e, _]) => return (Ineq.lt, e)
-  | (``LE.le, #[e, _]) => return (Ineq.le, e)
-  | (``Eq, #[e, _]) => return (Ineq.eq, e)
+  | (``LT.lt, #[_, _, e, _]) => return (Ineq.lt, e)
+  | (``LE.le, #[_, _, e, _]) => return (Ineq.le, e)
+  | (``Eq, #[_, e, _]) => return (Ineq.eq, e)
   | _ => throwError "invalid comparison: {e}"
+
 -- TODO It would be nice to use `QQ`, but it assumes `0 : ℕ`.
+-- open Qq
 -- def parseCompAndExpr : Q(Prop) → MetaM (Ineq × Expr)
 -- | ~q($e < 0) => return (Ineq.lt, e)
 -- | ~q($e ≤ 0) => return (Ineq.le, e)

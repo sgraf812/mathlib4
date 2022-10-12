@@ -130,19 +130,26 @@ implication, along with the type of `a` and `b`.
 
 For example, if `e` is `(a : ℕ) < b`, returns ``(`lt_of_not_ge, ℕ)``.
 -/
-def get_contr_lemma_name_and_type : Expr → Option (Name × Expr) := sorry
--- | `(@has_lt.lt %%tp %%_ _ _) := return (`lt_of_not_ge, tp)
--- | `(@has_le.le %%tp %%_ _ _) := return (`le_of_not_gt, tp)
--- | `(@eq %%tp _ _) := return (``eq_of_not_lt_of_not_gt, tp)
--- | `(@ne %%tp _ _) := return (`not.intro, tp)
--- | `(@ge %%tp %%_ _ _) := return (`le_of_not_gt, tp)
--- | `(@gt %%tp %%_ _ _) := return (`lt_of_not_ge, tp)
--- | `(¬ @has_lt.lt %%tp %%_ _ _) := return (`not.intro, tp)
--- | `(¬ @has_le.le %%tp %%_ _ _) := return (`not.intro, tp)
--- | `(¬ @eq %%tp _ _) := return (``not.intro, tp)
--- | `(¬ @ge %%tp %%_ _ _) := return (`not.intro, tp)
--- | `(¬ @gt %%tp %%_ _ _) := return (`not.intro, tp)
--- | _ := none
+def get_contr_lemma_name_and_type (e : Expr) : Option (Name × Expr) :=
+match e.getAppFnArgs with
+| (``LT.lt, #[t, _, _, _]) => (``lt_of_not_ge, t)
+| (``LE.le, #[t, _, _, _]) => (``le_of_not_gt, t)
+| (``Eq, #[t, _, _]) => (``eq_of_not_lt_of_not_gt, t)
+| (``Ne, #[t, _, _]) => (``Not.intro, t)
+| (``GE.ge, #[t, _, _, _]) => (`le_of_not_gt, t)
+| (``GT.gt, #[t, _, _, _]) => (`lt_of_not_ge, t)
+| (``Not, #[e']) => match e'.getAppFnArgs with
+  | (``LT.lt, #[t, _, _, _]) => (``Not.intro, t)
+  | (``LE.le, #[t, _, _, _]) => (``Not.intro, t)
+  | (``Eq, #[t, _, _]) => (``Not.intro, t)
+  | (``GE.ge, #[t, _, _, _]) => (``Not.intro, t)
+  | (``GT.gt, #[t, _, _, _]) => (``Not.intro, t)
+  | _ => none
+| _ => none
+
+/-- Same as `mkConst`, but with fresh level metavariables. -/
+def mkConst' (constName : Name) : MetaM Expr := do
+  return mkConst constName (← (← getConstInfo constName).levelParams.mapM fun _ => mkFreshLevelMVar)
 
 /--
 `apply_contr_lemma` inspects the target to see if it can be moved to a hypothesis by negation.
@@ -152,16 +159,13 @@ It returns the type of the terms in the comparison (e.g. the type of `a` and `b`
 newly introduced local constant.
 Otherwise returns `none`.
 -/
-def apply_contr_lemma : TacticM (Option (Expr × Expr)) := do
-  let t ← getMainTarget
-  match get_contr_lemma_name_and_type t with
+def apply_contr_lemma (g : MVarId) : MetaM (Option (Expr × Expr) × List MVarId) := do
+  match get_contr_lemma_name_and_type (← g.getType) with
   | some (nm, tp) => do
-      sorry
-      -- FIXME pseudo-Lean4
-      -- refine ((expr.const nm []) pexpr.mk_placeholder)
-      -- let v ← intro1
-      -- return some (tp, v)
-  | none => return none
+      let [g] ← g.apply (← mkConst' nm) | failure
+      let (f, g) ← g.intro1P
+      return (some (tp, .fvar f), [g])
+  | none => return (none, [g])
 
 /--
 `partition_by_type l` takes a list `l` of proofs of comparisons. It sorts these proofs by
@@ -283,19 +287,19 @@ def allGoals (tac : TacticM Unit) : TacticM Unit := do
 
 -- #eval F' (fun n m => return (n+1, n*m)) 0 #[1,2,3,4] -- (#[0, 2, 6, 12], 4)
 
-/-- Asserts an expression as an anonymous hypothesis. -/
-def noteAnonymous (g : MVarId) (e : Expr) : MetaM (FVarId × MVarId) := do
-  (← g.assert .anonymous (←inferType e) e).intro1P
+-- /-- Asserts an expression as an anonymous hypothesis. -/
+-- def noteAnonymous (g : MVarId) (e : Expr) : MetaM (FVarId × MVarId) := do
+--   (← g.assert .anonymous (←inferType e) e).intro1P
 
-/-- Asserts an array of expressions as anonymous hypotheses. -/
-def noteAllAnonymous (g : MVarId) (es : Array Expr) : MetaM (Array FVarId × MVarId) := do
-  let mut z := g
-  let mut fs : Array FVarId := Array.mkEmpty es.size
-  for e in es do
-    let (f, g') ← noteAnonymous z e
-    z := g'
-    fs := fs.push f
-  return (fs, z)
+-- /-- Asserts an array of expressions as anonymous hypotheses. -/
+-- def noteAllAnonymous (g : MVarId) (es : Array Expr) : MetaM (Array FVarId × MVarId) := do
+--   let mut z := g
+--   let mut fs : Array FVarId := Array.mkEmpty es.size
+--   for e in es do
+--     let (f, g') ← noteAnonymous z e
+--     z := g'
+--     fs := fs.push f
+--   return (fs, z)
 
 /--
 `linarith reduce_semi only_on hyps cfg` tries to close the goal using linear arithmetic. It fails
@@ -321,7 +325,7 @@ do
     -- FIXME this step is unnecessary, right? There's no need to note expressions as hypotheses.
     -- let (hyps, g) ← noteAllAnonymous (←getMainGoal) hyps
     if cfg.split_hypotheses then do
-      linarithTrace "trying to split hypotheses"
+      -- linarithTrace "trying to split hypotheses"
       -- FIXME `auto.split_hyps` hasn't been ported.
       -- try auto.split_hyps
   /- If we are proving a comparison goal (and not just `false`), we consider the type of the
@@ -330,25 +334,32 @@ do
     In this case we also recieve a new variable from moving the goal to a hypothesis.
     Otherwise, there is no preferred type and no new variable; we simply change the goal to `false`.
   -/
-    let pref_type_and_new_var_from_tgt ← apply_contr_lemma
+    -- TODO can we rename liftMetaTacticAux?
+    -- TODO do this with a match
+    let pref_type_and_new_var_from_tgt ← liftMetaTacticAux apply_contr_lemma
+
     if pref_type_and_new_var_from_tgt.isNone then
       if cfg.exfalso then
         linarithTrace "using exfalso"
         -- FIXME exfalso
       else throwError "linarith failed: target is not a valid comparison"
+
     let cfg := cfg.updateReducibility reduce_semi
     let (pref_type, new_var) :=
       pref_type_and_new_var_from_tgt.elim (none, none) (Prod.map some some)
+
     -- set up the list of hypotheses, considering the `only_on` and `restrict_type` options
     let hyps ← (if only_on then do return new_var.toList ++ hyps
-      else do return []) -- FIXME (++ hyps) <$> local_context,
+      else do return (←getLCtx).getFVars.toList ++ hyps)
+
     -- FIXME restore handling of restricting types:
     -- let hyps ← (do
     --   let t ← get_restrict_type cfg.restrict_type_reflect
     --   filter_hyps_to_type t hyps) <|>
     --   return hyps
+
     linarithTraceProofs "linarith is running on the following hypotheses:" hyps
-    run_linarith_on_pfs cfg hyps pref_type
+    -- run_linarith_on_pfs cfg hyps pref_type
 
 open Parser Tactic
 open Syntax
@@ -382,6 +393,17 @@ elab_rules : tactic
     tactic.linarith false o.isSome
       (← ((args.map (TSepArray.getElems)).getD {}).mapM (elabTerm ·.raw none)).toList
       (← elabLinarithConfig (mkOptionalNode cfg))
+
+set_option trace.linarith true
+
+example (h : 1 < 0) : 3 < 7 := by
+  linarith [Nat.zero_lt_one]
+  all_goals admit
+
+
+example (h : 1 < 0) : 3 = 7 := by
+  linarith [Nat.zero_lt_one]
+  all_goals admit
 
 -- FIXME We have to repeat all that just to handle the `!`?
 -- Copy doc-string?
