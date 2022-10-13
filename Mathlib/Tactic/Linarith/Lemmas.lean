@@ -33,8 +33,6 @@ theorem lt_zero_of_zero_gt [Zero α] [LT α] {a : α} (h : 0 > a) : a < 0 := h
 
 theorem le_zero_of_zero_ge [Zero α] [LE α] {a : α} (h : 0 ≥ a) : a ≤ 0 := h
 
-theorem sub_eq_zero_of_eq [AddGroup G] {a b : G} : a = b → a - b = 0 := sorry
-
 theorem sub_nonpos_of_le [AddGroup α] [LE α] [CovariantClass α α (swap (· + ·)) (· ≤ ·)] {a b : α} : a ≤ b → a - b ≤ 0 := sorry
 
 theorem sub_neg_of_lt [AddGroup α] [LT α] [CovariantClass α α (swap (· + ·)) (· < ·)] {a b : α} : a < b → a - b < 0 := sorry
