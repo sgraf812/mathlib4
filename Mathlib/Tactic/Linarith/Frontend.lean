@@ -151,14 +151,20 @@ match e.getAppFnArgs with
 def mkConst' (constName : Name) : MetaM Expr := do
   return mkConst constName (← (← getConstInfo constName).levelParams.mapM fun _ => mkFreshLevelMVar)
 
+-- def instantiateTypeMVars (e : Expr) : MetaM Expr := do
+--   let t ← instantiateMVars (← inferType e)
+--   let m ← mkFreshExprMVar t
+--   _ ← isDefEq m e
+--   return (← instantiateMVars m)
+
 def getLocalHyps : MetaM (Array Expr) := do
   let mut hs := #[]
   for d in ← getLCtx do
-    if !d.isAuxDecl then hs := hs.push d.toExpr
+    if !d.isImplementationDetail then hs := hs.push d.toExpr
   return hs
 
 def foo (g : MVarId) : MetaM MVarId := do
-  let [g] ← g.apply (← mkConst' ``Not.intro) | failure
+  let [g] ← g.apply (mkConst ``Not.intro) | failure
   let (_, g) ← g.intro1P
   return g
 
@@ -238,7 +244,7 @@ let single_process : MVarId → List Expr → TermElabM Expr :=
    linarithTraceProofs
      ("after preprocessing, linarith has " ++ toString hyps.length ++ " facts:") hyps
    let hyp_set ← partition_by_type hyps
-   linarithTrace "hypotheses appear in {hyp_set.size} different types"
+   linarithTrace m!"hypotheses appear in {hyp_set.size} different types"
    match pref_type with
    | some t => proveFalseByLinarith cfg g (hyp_set.findD t []) <|>
                try_linarith_on_lists cfg g ((hyp_set.erase t).values)
@@ -278,6 +284,7 @@ end Linarith
 
 open Linarith
 open Lean Elab Tactic Meta
+
 
 /--
 Run a tactic on all goals, and always succeeds.
@@ -372,13 +379,13 @@ do
   /- If we are proving a comparison goal (and not just `false`), we consider the type of the
     elements in the comparison to be the "preferred" type. That is, if we find comparison
     hypotheses in multiple types, we will run `linarith` on the goal type first.
-    In this case we also recieve a new variable from moving the goal to a hypothesis.
+    In this case we also receive a new variable from moving the goal to a hypothesis.
     Otherwise, there is no preferred type and no new variable; we simply change the goal to `false`.
   -/
     linarithTrace "before apply_contr_lemma"
     g.withContext do
       for f in ← getLCtx do
-        if !f.isAuxDecl then
+        if !f.isImplementationDetail then
           linarithTrace (← inferType f.toExpr)
 
     -- TODO can we rename liftMetaTacticAux?
@@ -413,8 +420,8 @@ do
 
       linarithTraceProofs "linarith is running on the following hypotheses:" hyps
       run_linarith_on_pfs cfg pref_type g hyps |>.run'
-    failure
-    -- return []
+    -- failure
+    return []
 
 open Parser Tactic
 open Syntax
@@ -452,7 +459,7 @@ elab_rules : tactic
 
 set_option trace.linarith true
 
-example (h : 1 < 0) (g : 37 < 42) : 3 < 7 := by
+example (h : 1 < 0) (g : ¬ 37 < 42) (k : True) /-(l : (-7 : ℤ) < 5)-/: 3 < 7 := by
   linarith [Nat.zero_lt_one]
   all_goals admit
 

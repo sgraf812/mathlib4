@@ -47,25 +47,25 @@ partial def rearr_comp_aux (proof e : Expr) : MetaM Expr :=
   match e.getAppFnArgs with
   | (``LE.le, #[_, _, a, b]) => match a.getAppFnArgs, b.getAppFnArgs with
     | _, (``OfNat.ofNat, #[_, .lit (.natVal 0), _]) => return proof
-    | (``OfNat.ofNat, #[_, .lit (.natVal 0), _]), _ => mkAppM `neg_nonpos_of_nonneg #[proof]
-    | _, _                                          => mkAppM `sub_nonpos_of_le #[proof]
+    | (``OfNat.ofNat, #[_, .lit (.natVal 0), _]), _ => mkAppM ``neg_nonpos_of_nonneg #[proof]
+    | _, _                                          => mkAppM ``sub_nonpos_of_le #[proof]
   | (``LT.lt, #[_, _, a, b]) => match a.getAppFnArgs, b.getAppFnArgs with
     | _, (``OfNat.ofNat, #[_, .lit (.natVal 0), _]) => return proof
-    | (``OfNat.ofNat, #[_, .lit (.natVal 0), _]), _ => mkAppM `neg_neg_of_pos #[proof]
-    | _, _                                          => mkAppM `sub_neg_of_lt #[proof]
+    | (``OfNat.ofNat, #[_, .lit (.natVal 0), _]), _ => mkAppM ``neg_neg_of_pos #[proof]
+    | _, _                                          => mkAppM ``sub_neg_of_lt #[proof]
   | (``Eq, #[_, a, b]) => match a.getAppFnArgs, b.getAppFnArgs with
     | _, (``OfNat.ofNat, #[_, .lit (.natVal 0), _]) => return proof
-    | (``OfNat.ofNat, #[_, .lit (.natVal 0), _]), _ => mkAppM `Eq.symm #[proof]
-    | _, _                                          => mkAppM `sub_eq_zero_of_eq #[proof]
+    | (``OfNat.ofNat, #[_, .lit (.natVal 0), _]), _ => mkAppM ``Eq.symm #[proof]
+    | _, _                                          => mkAppM ``sub_eq_zero_of_eq #[proof]
   | (``GT.gt, #[_, _, a, b]) => match a.getAppFnArgs, b.getAppFnArgs with
-    | _, (``OfNat.ofNat, #[_, .lit (.natVal 0), _]) => mkAppM `neg_neg_of_pos #[proof]
-    | (``OfNat.ofNat, #[_, .lit (.natVal 0), _]), _ => mkAppM `lt_zero_of_zero_gt #[proof]
-    | _, _                                          => mkAppM `sub_neg_of_lt #[proof]
+    | _, (``OfNat.ofNat, #[_, .lit (.natVal 0), _]) => mkAppM ``neg_neg_of_pos #[proof]
+    | (``OfNat.ofNat, #[_, .lit (.natVal 0), _]), _ => mkAppM ``lt_zero_of_zero_gt #[proof]
+    | _, _                                          => mkAppM ``sub_neg_of_lt #[proof]
   | (``GE.ge, #[_, _, a, b]) => match a.getAppFnArgs, b.getAppFnArgs with
-    | _, (``OfNat.ofNat, #[_, .lit (.natVal 0), _]) => mkAppM `neg_nonpos_of_nonneg #[proof]
-    | (``OfNat.ofNat, #[_, .lit (.natVal 0), _]), _ => mkAppM `le_zero_of_zero_ge #[proof]
-    | _, _                                          => mkAppM `sub_nonpos_of_le #[proof]
-  | (``Not.intro, #[a]) => do
+    | _, (``OfNat.ofNat, #[_, .lit (.natVal 0), _]) => mkAppM ``neg_nonpos_of_nonneg #[proof]
+    | (``OfNat.ofNat, #[_, .lit (.natVal 0), _]), _ => mkAppM ``le_zero_of_zero_ge #[proof]
+    | _, _                                          => mkAppM ``sub_nonpos_of_le #[proof]
+  | (``Not, #[a]) => do
     let nproof ← rem_neg proof a
     rearr_comp_aux nproof (← inferType nproof)
   | a => throwError m!"couldn't rearrange comp {a}"
@@ -75,7 +75,7 @@ partial def rearr_comp_aux (proof e : Expr) : MetaM Expr :=
 and turns it into a proof of a comparison `_ R 0`, where `R ∈ {=, ≤, <}`.
  -/
 def rearr_comp (e : Expr) : MetaM Expr := do
-  rearr_comp_aux e (← inferType e)
+  rearr_comp_aux e (← instantiateMVars (← inferType e))
 
 /-- If `e` is of the form `((n : ℕ) : ℤ)`, `is_nat_int_coe e` returns `n : ℕ`. -/
 def is_nat_int_coe (e : Expr) : Option Expr :=
@@ -103,11 +103,11 @@ and similarly if `pf` proves a negated weak inequality.
 -/
 def mk_non_strict_int_pf_of_strict_int_pf (pf : Expr) : MetaM Expr := do
   match (← inferType pf).getAppFnArgs with
-  | (``LT.lt, #[_, _, _, _]) => return mkApp (← mkAppM ``Iff.mpr #[mkConst ``Int.add_one_le_iff]) pf
-  | (``GT.gt, #[_, _, _, _]) => return mkApp (← mkAppM ``Iff.mpr #[mkConst ``Int.add_one_le_iff]) pf
-  | (``Not.intro, #[P]) => match P.getAppFnArgs with
-    | (``LE.le, #[_, _, _, _]) => return mkApp (← mkAppM ``Iff.mpr #[mkConst ``Int.add_one_le_iff]) (← mkAppM `le_of_not_get #[pf])
-    | (``GE.ge, #[_, _, _, _]) => return mkApp (← mkAppM ``Iff.mpr #[mkConst ``Int.add_one_le_iff]) (← mkAppM `le_of_not_get #[pf])
+  | (``LT.lt, #[_, _, _, _]) => return mkApp (← mkAppM ``Iff.mpr #[← mkAppOptM ``Int.add_one_le_iff #[none, none]]) pf
+  | (``GT.gt, #[_, _, _, _]) => return mkApp (← mkAppM ``Iff.mpr #[← mkAppOptM ``Int.add_one_le_iff #[none, none]]) pf
+  | (``Not, #[P]) => match P.getAppFnArgs with
+    | (``LE.le, #[_, _, _, _]) => return mkApp (← mkAppM ``Iff.mpr #[← mkAppOptM ``Int.add_one_le_iff #[none, none]]) (← mkAppM `le_of_not_gt #[pf])
+    | (``GE.ge, #[_, _, _, _]) => return mkApp (← mkAppM ``Iff.mpr #[← mkAppOptM ``Int.add_one_le_iff #[none, none]]) (← mkAppM `le_of_not_gt #[pf])
     | _ => throwError "mk_non_strict_int_pf_of_strict_int_pf failed: proof is not an inequality"
   | _ => throwError "mk_non_strict_int_pf_of_strict_int_pf failed: proof is not an inequality"
 
@@ -122,7 +122,7 @@ partial def is_nat_prop (e : Expr) : Bool :=
   | (``LT.lt, #[.const ``Nat [], _, _, _]) => true
   | (``GE.ge, #[.const ``Nat [], _, _, _]) => true
   | (``GT.gt, #[.const ``Nat [], _, _, _]) => true
-  | (``Not.intro, #[e]) => is_nat_prop e
+  | (``Not, #[e]) => is_nat_prop e
   | _ => false
 
 /--
@@ -133,7 +133,7 @@ def is_strict_int_prop (e : Expr) : Bool :=
   match e.getAppFnArgs with
   | (``LT.lt, #[.const ``Int [], _, _, _]) => true
   | (``GT.gt, #[.const ``Int [], _, _, _]) => true
-  | (``Not.intro, #[e]) => match e.getAppFnArgs with
+  | (``Not, #[e]) => match e.getAppFnArgs with
     | (``LE.le, #[.const ``Int [], _, _, _]) => true
     | (``GE.ge, #[.const ``Int [], _, _, _]) => true
     | _ => false
@@ -146,7 +146,7 @@ partial def filter_comparisons_aux (e : Expr) : Bool :=
   | (``LT.lt, _) => true
   | (``GE.ge, _) => true
   | (``GT.gt, _) => true
-  | (``Not.intro, #[e]) => filter_comparisons_aux e -- TODO hmm, this lets `¬ ¬ a ≤ b` through, but we probably can't handle that
+  | (``Not, #[e]) => filter_comparisons_aux e -- TODO hmm, this lets `¬ ¬ a ≤ b` through, but we probably can't handle that
   | _ => false
 
 /--
@@ -155,7 +155,7 @@ Removes any expressions that are not proofs of inequalities, equalities, or nega
 def filter_comparisons : Preprocessor :=
 { name := "filter terms that are not proofs of comparisons",
   transform := fun h => do
-   let tp ← inferType h
+   let tp ← instantiateMVars (← inferType h)
    if (← isProp tp) && filter_comparisons_aux tp then return [h]
    else return [] }
 
@@ -208,9 +208,7 @@ and turns it into a proof of a comparison `_ R 0`, where `R ∈ {=, ≤, <}`.
  -/
 def make_comp_with_zero : Preprocessor :=
 { name := "make comparisons with zero",
-  transform := fun e => do
-    try return [← rearr_comp e]
-    catch _ => return [] }
+  transform := fun e => do return [← rearr_comp e] }
 
 -- FIXME the `cancel_denoms : Preprocessor` from mathlib3 will need to wait
 -- for a port of the `cancel_denoms` tactic.

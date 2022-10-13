@@ -36,9 +36,9 @@ def linarithTrace {α} [ToMessageData α] (s : α) : CoreM Unit := do
 A shorthand for tracing the types of a list of proof terms
 when the `trace.linarith` option is set to true.
 -/
-def linarithTraceProofs (s : String := "") (l : List Expr) : MetaM Unit := do
-  trace[linarith] s
-  trace[linarith] (← l.mapM inferType)
+def linarithTraceProofs {α} [ToMessageData α] (s : α) (l : List Expr) : MetaM Unit := do
+  trace[linarith] "{s}"
+  trace[linarith] (← l.mapM fun e => do instantiateMVars (← inferType e))
 
 /-! ### Linear expressions -/
 
@@ -266,7 +266,7 @@ A `Preprocessor` lifts to a `GlobalPreprocessor` by folding it over the input li
 -/
 def Preprocessor.globalize (pp : Preprocessor) : GlobalPreprocessor :=
 { name := pp.name,
-  transform := List.foldlM (fun ret e => do return (← pp.transform e) ++ ret) [] }
+  transform := List.foldrM (fun e ret => do return (← pp.transform e) ++ ret) [] }
 
 /--
 A `GlobalPreprocessor` lifts to a `GlobalBranchingPreprocessor` by producing only one branch.
@@ -283,10 +283,10 @@ def GlobalBranchingPreprocessor.process (pp : GlobalBranchingPreprocessor)
   (g : MVarId) (l : List Expr) : MetaM (List Branch) := do
   let branches ← pp.transform g l
   if (branches.length > 1) then
-    linarithTrace (format "Preprocessing: {pp.name} has branched, with branches:")
+    linarithTrace m!"Preprocessing: {pp.name} has branched, with branches:"
   for ⟨goal, hyps⟩ in branches do
     goal.withContext do
-      linarithTraceProofs (toString (format "Preprocessing: {pp.name}")) hyps
+      linarithTraceProofs m!"Preprocessing: {pp.name}" hyps
   return branches
 
 instance PreprocessorToGlobalBranchingPreprocessor :

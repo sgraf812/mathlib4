@@ -24,3 +24,21 @@ lemma eq_of_not_lt_of_not_gt {α} [LinearOrder α] (a b : α) (h1 : ¬ a < b) (h
 le_antisymm (le_of_not_gt h2) (le_of_not_gt h1)
 
 end Linarith
+
+section
+open Function
+-- These lemmas can be removed when their originals are ported.
+
+theorem lt_zero_of_zero_gt [Zero α] [LT α] {a : α} (h : 0 > a) : a < 0 := h
+
+theorem le_zero_of_zero_ge [Zero α] [LE α] {a : α} (h : 0 ≥ a) : a ≤ 0 := h
+
+theorem sub_eq_zero_of_eq [AddGroup G] {a b : G} : a = b → a - b = 0 := sorry
+
+theorem sub_nonpos_of_le [AddGroup α] [LE α] [CovariantClass α α (swap (· + ·)) (· ≤ ·)] {a b : α} : a ≤ b → a - b ≤ 0 := sorry
+
+theorem sub_neg_of_lt [AddGroup α] [LT α] [CovariantClass α α (swap (· + ·)) (· < ·)] {a b : α} : a < b → a - b < 0 := sorry
+
+theorem neg_nonpos_of_nonneg [OrderedAddCommGroup α] {a : α} : 0 ≤ a → -a ≤ 0 := sorry
+
+theorem neg_neg_of_pos [OrderedAddCommGroup α] {a : α} : 0 < a → -a < 0 := sorry

@@ -196,7 +196,7 @@ def proveFalseByLinarith (cfg : LinarithConfig) : MVarId → List Expr → TermE
     -- logInfo m!"{comps}"
     -- logInfo m!"{max_var}"
     -- let oracle := cfg.oracle.getD FourierMotzkin.produceCertificate
-    failure
+    throwError "hello world"
     -- let certificate : Std.HashMap Nat Nat ← oracle comps max_var
     --   <|> throwError "linarith failed to find a contradiction"
     -- linarithTrace "linarith has found a contradiction"
