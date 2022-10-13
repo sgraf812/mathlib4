@@ -129,30 +129,35 @@ partial def is_nat_prop (e : Expr) : Bool :=
 `is_strict_int_prop tp` is true iff `tp` is a strict inequality between integers
 or the negation of a weak inequality between integers.
 -/
-def is_strict_int_prop : Expr → Bool := sorry
--- | `(@has_lt.lt ℤ %%_ _ _) := tt
--- | `(@gt ℤ %%_ _ _) := tt
--- | `(¬ @has_le.le ℤ %%_ _ _) := tt
--- | `(¬ @ge ℤ %%_ _ _) := tt
--- | _ := ff
+def is_strict_int_prop (e : Expr) : Bool :=
+  match e.getAppFnArgs with
+  | (``LT.lt, #[.const ``Int [], _, _, _]) => true
+  | (``GT.gt, #[.const ``Int [], _, _, _]) => true
+  | (``Not.intro, #[e]) => match e.getAppFnArgs with
+    | (``LE.le, #[.const ``Int [], _, _, _]) => true
+    | (``GE.ge, #[.const ``Int [], _, _, _]) => true
+    | _ => false
+  | _ => false
 
-private def filter_comparisons_aux : Expr → Bool := sorry
--- | `(¬ %%p) := p.app_symbol_in [`has_lt.lt, `has_le.le, `gt, `ge]
--- | tp := tp.app_symbol_in [`has_lt.lt, `has_le.le, `gt, `ge, `eq]
+partial def filter_comparisons_aux (e : Expr) : Bool :=
+  match e.getAppFnArgs with
+  | (``Eq, _) => true
+  | (``LE.le, _) => true
+  | (``LT.lt, _) => true
+  | (``GE.ge, _) => true
+  | (``GT.gt, _) => true
+  | (``Not.intro, #[e]) => filter_comparisons_aux e -- TODO hmm, this lets `¬ ¬ a ≤ b` through, but we probably can't handle that
+  | _ => false
 
 /--
 Removes any expressions that are not proofs of inequalities, equalities, or negations thereof.
 -/
 def filter_comparisons : Preprocessor :=
 { name := "filter terms that are not proofs of comparisons",
-  transform := fun h => (do
+  transform := fun h => do
    let tp ← inferType h
-   sorry
-  --  is_prop tp >>= guardb
-  --  guardb (filter_comparisons_aux tp)
-  --  return [h]
-   )
-<|> return [] }
+   if (← isProp tp) && filter_comparisons_aux tp then return [h]
+   else return [] }
 
 /--
 Replaces proofs of negations of comparisons with proofs of the reversed comparisons.

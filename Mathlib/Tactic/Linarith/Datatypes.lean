@@ -338,7 +338,7 @@ since this is typically needed when using stronger unification.
 def LinarithConfig.updateReducibility (cfg : LinarithConfig) (reduce_default : Bool) :
     LinarithConfig :=
   if reduce_default then
-    { cfg with transparency := .default, discharger := sorry /- do evalTactic (←`(tactic| ring!)) -/}
+    { cfg with transparency := .default, discharger := do evalTactic (←`(tactic| ring)) } -- TODO replace with `ring!` when available
   else cfg
 
 /-!

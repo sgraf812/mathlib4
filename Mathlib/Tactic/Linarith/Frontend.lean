@@ -461,13 +461,6 @@ example (h : 1 < 0) : 3 = 7 := by
   linarith [Nat.zero_lt_one]
   all_goals admit
 
-elab "foo" : tactic => do
-  let g ← getMainGoal
-  logInfo m!"{g}"
-  sorry
-
-example : True := by foo
-
 -- TODO We have to repeat all that just to handle the `!`?
 -- Copy doc-string?
 elab_rules : tactic
