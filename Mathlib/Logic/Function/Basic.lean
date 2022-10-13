@@ -506,6 +506,11 @@ lemma extend_def (f : α → β) (g : α → γ) (e' : β → γ) (b : β) [hd :
 by simp only [extend_def, dif_pos, exists_apply_eq_apply]
    exact congr_arg g (hf $ Classical.choose_spec (exists_apply_eq_apply f a))
 
+@[simp]
+theorem extend_apply' (g : α → γ) (e' : β → γ) (b : β) (hb : ¬∃ a, f a = b) :
+    extend f g e' b = e' b := by
+  simp [Function.extend_def, hb]
+
 @[simp] lemma extend_comp (hf : injective f) (g : α → γ) (e' : β → γ) :
   extend f g e' ∘ f = g :=
 funext $ λ a => extend_apply hf g e' a
