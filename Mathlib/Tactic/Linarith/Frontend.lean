@@ -459,13 +459,17 @@ elab_rules : tactic
 
 set_option trace.linarith true
 
+example [LinearOrderedAddCommGroup α] {a b : α} (h : a < b) (w : b < a) : False := by
+  -- apply eq_of_not_lt_of_not_gt
+  linarith
+
 example (h : 1 < 0) (g : ¬ 37 < 42) (k : True) /-(l : (-7 : ℤ) < 5)-/: 3 < 7 := by
-  linarith [Nat.zero_lt_one]
+  linarith [(rfl : 0 = 0)]
   all_goals admit
 
 
 example (h : 1 < 0) : 3 = 7 := by
-  linarith [Nat.zero_lt_one]
+  linarith [Int.zero_lt_one]
   all_goals admit
 
 -- TODO We have to repeat all that just to handle the `!`?

@@ -208,7 +208,10 @@ and turns it into a proof of a comparison `_ R 0`, where `R ∈ {=, ≤, <}`.
  -/
 def make_comp_with_zero : Preprocessor :=
 { name := "make comparisons with zero",
-  transform := fun e => do return [← rearr_comp e] }
+  transform := fun e =>
+  return [← rearr_comp e]
+  -- do try return [← rearr_comp e] catch _ => return []
+  }
 
 -- FIXME the `cancel_denoms : Preprocessor` from mathlib3 will need to wait
 -- for a port of the `cancel_denoms` tactic.
