@@ -138,7 +138,7 @@ def mk_neg_eq_zero_pf (e : Expr) : MetaM Expr := do
 -/
 def prove_eq_zero_using (tac : TacticM Unit) (e : Expr) : TermElabM Expr := do
   let ⟨u, α, e⟩ ← inferTypeQ' e
-  let h : Q(Zero $α) ← synthInstanceQ q(Zero $α) -- FIXME I don't know how to avoid this warning!
+  let _h : Q(Zero $α) ← synthInstanceQ q(Zero $α)
   synthesizeUsing q($e = 0) tac
 
 /--
@@ -182,36 +182,41 @@ It remains to produce proofs of (1) and (2). (1) is verified by calling the `dis
 of the `LinarithConfig` object, which is typically `ring`. We prove (2) by folding over the
 set of hypotheses.
 -/
-def proveFalseByLinarith (cfg : LinarithConfig) : List Expr → TacticM Expr
-| [] => throwError "no args to linarith"
-| l@(h::_) => do
+def proveFalseByLinarith (cfg : LinarithConfig) : MVarId → List Expr → TermElabM Expr
+| _, [] => throwError "no args to linarith"
+| g, l@(h::_) => do
     -- for the elimination to work properly, we must add a proof of `-1 < 0` to the list,
     -- along with negated equality proofs.
-    let l' ← add_neg_eq_pfs l
-    let hz ← mk_neg_one_lt_zero_pf (← ineq_prf_tp h)
-    let inputs := hz::l'
-    -- perform the elimination and fail if no contradiction is found.
-    let (comps, max_var) ← linearFormsAndMaxVar cfg.transparency inputs
-    let certificate ← cfg.oracle.getD FourierMotzkin.produceCertificate comps max_var
-      <|> throwError "linarith failed to find a contradiction"
-    linarithTrace "linarith has found a contradiction"
-    let enum_inputs := inputs.enum
-    -- construct a list pairing nonzero coeffs with the proof of their corresponding comparison
-    let zip := enum_inputs.filterMap (fun ⟨n, e⟩ => (certificate.find? n).map (e, ·))
-    let mls ← zip.mapM (fun ⟨e, n⟩ => do mulExpr n (← term_of_ineq_prf e))
-    -- `sm` is the sum of input terms, scaled to cancel out all variables.
-    let sm ← addExprs mls -- FIXME there was a to_expr here previously
-    linarithTrace "The expression\n  {sm}\nshould be both 0 and negative"
-    -- we prove that `sm = 0`, typically with `ring`.
-    let sm_eq_zero ← prove_eq_zero_using cfg.discharger sm
-    linarithTrace "We have proved that it is zero"
-    -- we also prove that `sm < 0`.
-    let sm_lt_zero ← mk_lt_zero_pf zip
-    linarithTrace "We have proved that it is negative"
-    -- this is a contradiction.
-    let pftp ← inferType sm_lt_zero
-    let ⟨_, nep, _⟩ ← (←getMainGoal).rewrite sm_eq_zero pftp
-    let pf' ← mkAppM ``Eq.mp #[nep, sm_lt_zero]
-    mkAppM `lt_irrefl #[pf']
+    logInfo m!"waking up in proveFalseByLinarith with {l}"
+    -- let l' ← add_neg_eq_pfs l
+    -- let hz ← mk_neg_one_lt_zero_pf (← ineq_prf_tp h)
+    -- let inputs := hz::l'
+    -- -- perform the elimination and fail if no contradiction is found.
+    -- let (comps, max_var) ← linearFormsAndMaxVar cfg.transparency inputs
+    -- logInfo m!"{comps}"
+    -- logInfo m!"{max_var}"
+    -- let oracle := cfg.oracle.getD FourierMotzkin.produceCertificate
+    failure
+    -- let certificate : Std.HashMap Nat Nat ← oracle comps max_var
+    --   <|> throwError "linarith failed to find a contradiction"
+    -- linarithTrace "linarith has found a contradiction"
+    -- let enum_inputs := inputs.enum
+    -- -- construct a list pairing nonzero coeffs with the proof of their corresponding comparison
+    -- let zip := enum_inputs.filterMap (fun ⟨n, e⟩ => (certificate.find? n).map (e, ·))
+    -- let mls ← zip.mapM (fun ⟨e, n⟩ => do mulExpr n (← term_of_ineq_prf e))
+    -- -- `sm` is the sum of input terms, scaled to cancel out all variables.
+    -- let sm ← addExprs mls -- FIXME there was a to_expr here previously
+    -- linarithTrace "The expression\n  {sm}\nshould be both 0 and negative"
+    -- -- we prove that `sm = 0`, typically with `ring`.
+    -- let sm_eq_zero ← prove_eq_zero_using cfg.discharger sm
+    -- linarithTrace "We have proved that it is zero"
+    -- -- we also prove that `sm < 0`.
+    -- let sm_lt_zero ← mk_lt_zero_pf zip
+    -- linarithTrace "We have proved that it is negative"
+    -- -- this is a contradiction.
+    -- let pftp ← inferType sm_lt_zero
+    -- let ⟨_, nep, _⟩ ← g.rewrite sm_eq_zero pftp
+    -- let pf' ← mkAppM ``Eq.mp #[nep, sm_lt_zero]
+    -- mkAppM `lt_irrefl #[pf']
 
 end Linarith

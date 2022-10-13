@@ -84,7 +84,7 @@ which takes a list of comparisons and the largest variable
 index appearing in those comparisons, and returns a map from comparison indices to coefficients.
 An alternate oracle can be specified in the `LinarithConfig` object.
 
--- FIXME Not implemented yet
+-- TODO Not implemented yet
 A variant, `nlinarith`, adds an extra preprocessing step to handle some basic nonlinear goals.
 There is a hook in the `linarith_config` configuration object to add custom preprocessing routines.
 
@@ -92,7 +92,7 @@ The certificate checking step is *not* by reflection. `linarith` converts the ce
 proof term of type `false`.
 
 Some of the behavior of `linarith` can be inspected with the option
-`set_option trace.linarith true`. -- FIXME check this
+`set_option trace.linarith true`.
 Because the variable elimination happens outside the tactic monad, we cannot trace intermediate
 steps there.
 
@@ -151,6 +151,33 @@ match e.getAppFnArgs with
 def mkConst' (constName : Name) : MetaM Expr := do
   return mkConst constName (← (← getConstInfo constName).levelParams.mapM fun _ => mkFreshLevelMVar)
 
+def getLocalHyps : MetaM (Array Expr) := do
+  let mut hs := #[]
+  for d in ← getLCtx do
+    if !d.isAuxDecl then hs := hs.push d.toExpr
+  return hs
+
+def foo (g : MVarId) : MetaM MVarId := do
+  let [g] ← g.apply (← mkConst' ``Not.intro) | failure
+  let (_, g) ← g.intro1P
+  return g
+
+def bar (g : MVarId) : MetaM (List MVarId) := do
+  let g ← foo g
+  g.withContext do
+    let hyps ← getLocalHyps
+    logInfo m!"{hyps}"
+    let types ← hyps.mapM inferType
+    let types ← types.mapM instantiateMVars
+    logInfo m!"{types}"
+    return [g]
+
+elab "bar" : tactic => do liftMetaTactic bar
+
+example (h : 0 < 1) : ¬ 7 < 3 := by
+  bar
+  admit
+
 /--
 `apply_contr_lemma` inspects the target to see if it can be moved to a hypothesis by negation.
 For example, a goal `⊢ a ≤ b` can become `a > b ⊢ false`.
@@ -159,20 +186,22 @@ It returns the type of the terms in the comparison (e.g. the type of `a` and `b`
 newly introduced local constant.
 Otherwise returns `none`.
 -/
-def apply_contr_lemma (g : MVarId) : MetaM (Option (Expr × Expr) × List MVarId) := do
+def apply_contr_lemma (g : MVarId) : MetaM (Option (Expr × Expr) × MVarId) := do
   match get_contr_lemma_name_and_type (← g.getType) with
   | some (nm, tp) => do
       let [g] ← g.apply (← mkConst' nm) | failure
       let (f, g) ← g.intro1P
-      return (some (tp, .fvar f), [g])
-  | none => return (none, [g])
+      return (some (tp, .fvar f), g)
+  | none => return (none, g)
+
+
 
 /--
 `partition_by_type l` takes a list `l` of proofs of comparisons. It sorts these proofs by
 the type of the variables in the comparison, e.g. `(a : ℚ) < 1` and `(b : ℤ) > c` will be separated.
 Returns a map from a type to a list of comparisons over that type.
 -/
-def partition_by_type (l : List Expr) : TacticM (Std.HashMap Expr (List Expr)) :=
+def partition_by_type (l : List Expr) : MetaM (Std.HashMap Expr (List Expr)) :=
 l.foldlM (fun m h => do return m.consVal (← ineq_prf_tp h) h) HashMap.empty
 
 /--
@@ -180,9 +209,15 @@ Given a list `ls` of lists of proofs of comparisons, `try_linarith_on_lists cfg 
 prove `false` by calling `linarith` on each list in succession. It will stop at the first proof of
 `false`, and fail if no contradiction is found with any list.
 -/
-def try_linarith_on_lists (cfg : LinarithConfig) (ls : List (List Expr)) : TacticM Expr :=
-ls.firstM (fun L => proveFalseByLinarith cfg L)
+def try_linarith_on_lists (cfg : LinarithConfig) (g : MVarId) (ls : List (List Expr)) : TermElabM Expr :=
+ls.firstM (fun L => proveFalseByLinarith cfg g L)
   <|> throwError "linarith failed to find a contradiction"
+
+-- There is a `TacticM` level version of this, but I want it in `MetaM` ...
+def ensureHasNoMVars (e : Expr) : MetaM Unit := do
+  let e ← instantiateMVars e
+  if e.hasExprMVar then
+    throwError "tactic failed, resulting expression contains metavariables{indentExpr e}"
 
 /--
 Given a list `hyps` of proofs of comparisons, `run_linarith_on_pfs cfg hyps pref_type`
@@ -194,27 +229,30 @@ In each branch, we partition the  list of hypotheses by type, and run `linarith`
 in the partition; one of these must succeed in order for `linarith` to succeed on this branch.
 If `pref_type` is given, it will first use the class of proofs of comparisons over that type.
 -/
-def run_linarith_on_pfs (cfg : LinarithConfig) (hyps : List Expr) (pref_type : Option Expr) :
-  TacticM Unit :=
+-- If it succeeds, the passed metavariable should have been assigned.
+def run_linarith_on_pfs (cfg : LinarithConfig) (pref_type : Option Expr) (g : MVarId)
+    (hyps : List Expr) : TermElabM Unit :=
 -- TODO make more idiomatic
-let single_process := fun hyps : List Expr => do
+let single_process : MVarId → List Expr → TermElabM Expr :=
+  fun (g : MVarId) (hyps : List Expr) => do
    linarithTraceProofs
      ("after preprocessing, linarith has " ++ toString hyps.length ++ " facts:") hyps
    let hyp_set ← partition_by_type hyps
    linarithTrace "hypotheses appear in {hyp_set.size} different types"
    match pref_type with
-   | some t => proveFalseByLinarith cfg (hyp_set.findD t []) <|>
-               try_linarith_on_lists cfg ((hyp_set.erase t).values)
-   | none => try_linarith_on_lists cfg hyp_set.values
+   | some t => proveFalseByLinarith cfg g (hyp_set.findD t []) <|>
+               try_linarith_on_lists cfg g ((hyp_set.erase t).values)
+   | none => try_linarith_on_lists cfg g hyp_set.values
 let preprocessors := cfg.preprocessors.getD default_preprocessors
--- FIXME restore when the `remove_ne` preprocessor is implemented
+-- TODO restore when the `remove_ne` preprocessor is implemented
 -- let preprocessors := if cfg.split_ne then linarith.remove_ne::preprocessors else preprocessors
 do
-  let hyps ← preprocess preprocessors hyps
-  for hs in hyps do
-    setGoals [hs.1]
-    let r ← single_process hs.2
-    return () -- FIXME exact r
+  let branches ← preprocess preprocessors g hyps
+  for (g, es) in branches do
+    let r ← single_process g es
+    g.assign r
+  -- Verify that we closed the goal. Failure here should only result from a bad `Preprocessor`.
+  ensureHasNoMVars (.mvar g)
 
 /--
 `filter_hyps_to_type restr_type hyps` takes a list of proofs of comparisons `hyps`, and filters it
@@ -227,7 +265,7 @@ hyps.filterM (fun h => do
   | some (_, htype) => isDefEq htype restr_type
   | none => return false)
 
--- FIXME not sure what this is for, omit for now.
+-- TODO not sure what this is for, omit for now.
 -- /-- A hack to allow users to write `{restr_type := ℚ}` in configuration structures. -/
 -- meta def get_restrict_type (e : expr) : tactic expr :=
 -- do m ← mk_mvar,
@@ -301,12 +339,6 @@ def allGoals (tac : TacticM Unit) : TacticM Unit := do
 --     fs := fs.push f
 --   return (fs, z)
 
-def getLocalHyps : MetaM (Array Expr) := do
-  let mut hs := #[]
-  for d in ← getLCtx do
-    if !d.isAuxDecl then hs := hs.push d.toExpr
-  return hs
-
 /--
 `linarith reduce_semi only_on hyps cfg` tries to close the goal using linear arithmetic. It fails
 if it does not succeed at doing this.
@@ -318,22 +350,24 @@ expressions.
   comparisons in the local context.
 -/
 partial def tactic.linarith (reduce_semi : Bool) (only_on : Bool) (hyps : List Expr)
-  (cfg : LinarithConfig := {}) : TacticM Unit :=
+  (cfg : LinarithConfig := {}) (g : MVarId) : MetaM (List MVarId) := -- TODO add like `liftMetaFinishingTactic`? and change to `MetaM Unit`
 -- TODO make this better Lean4 style: lower the monads where possible, handle goals cleanly!
 do
   linarithTrace "waking up"
-  let t ← getMainTarget
+  logInfo m!"{g}"
   -- if the target is an equality, we run `linarith` twice, to prove ≤ and ≥.
-  if t.isEq then do
+  if (← g.getType).isEq then do
     linarithTrace "target is an equality: splitting"
-    evalTactic (← `(tactic| apply eq_of_not_lt_of_not_gt))
-    allGoals <| tactic.linarith reduce_semi only_on hyps cfg
+    let [g₁, g₂] ← g.apply (← mkConst' ``eq_of_not_lt_of_not_gt) | failure
+    -- TODO This is a bit silly, as we know that both lists are empty.
+    return (← tactic.linarith reduce_semi only_on hyps cfg g₁) ++
+      (← tactic.linarith reduce_semi only_on hyps cfg g₂)
   else do
-    -- FIXME this step is unnecessary, right? There's no need to note expressions as hypotheses.
+    -- TODO this step is unnecessary, right? There's no need to note expressions as hypotheses.
     -- let (hyps, g) ← noteAllAnonymous (←getMainGoal) hyps
     if cfg.split_hypotheses then do
       linarithTrace "trying to split hypotheses"
-      -- FIXME `auto.split_hyps` hasn't been ported.
+      -- TODO `auto.split_hyps` hasn't been ported.
       -- try auto.split_hyps
   /- If we are proving a comparison goal (and not just `false`), we consider the type of the
     elements in the comparison to be the "preferred" type. That is, if we find comparison
@@ -342,42 +376,45 @@ do
     Otherwise, there is no preferred type and no new variable; we simply change the goal to `false`.
   -/
     linarithTrace "before apply_contr_lemma"
-    for f in ← getLCtx do
-      if !f.isAuxDecl then
-        linarithTrace (← inferType f.toExpr)
+    g.withContext do
+      for f in ← getLCtx do
+        if !f.isAuxDecl then
+          linarithTrace (← inferType f.toExpr)
 
     -- TODO can we rename liftMetaTacticAux?
     -- TODO do this with a match
-    let pref_type_and_new_var_from_tgt ← liftMetaTacticAux apply_contr_lemma
+    let (pref_type_and_new_var_from_tgt, g) ← apply_contr_lemma g
+    logInfo m!"{g}"
+    -- FIXME we never escape this block??
+    -- let [g] ← if pref_type_and_new_var_from_tgt.isNone then
+    --   if cfg.exfalso then
+    --     linarithTrace "using exfalso"
+    --     g.apply (← mkConst' ``False.elim) -- TODO A `MetaM` level `exfalso`, please?
+    --   else throwError "linarith failed: target is not a valid comparison"
+    -- else return [g] | throwError "huh"
 
-    if pref_type_and_new_var_from_tgt.isNone then
-      if cfg.exfalso then
-        linarithTrace "using exfalso"
-        -- FIXME exfalso
-      else throwError "linarith failed: target is not a valid comparison"
-
-    let cfg := cfg.updateReducibility reduce_semi
+    -- TODO we should do this outside
+    -- let cfg := cfg.updateReducibility reduce_semi
     let (pref_type, new_var) :=
       pref_type_and_new_var_from_tgt.elim (none, none) (Prod.map some some)
 
-    withMainContext do
+    -- withMainContext do
     linarithTrace "after apply_contr_lemma"
-    for f in ← getLCtx do
-      if !f.isAuxDecl then
-        linarithTrace (← inferType f.toExpr)
-
+    g.withContext do
     -- set up the list of hypotheses, considering the `only_on` and `restrict_type` options
-    let hyps ← (if only_on then do return new_var.toList ++ hyps
-      else do return (← getLocalHyps).toList ++ hyps)
-
-    -- FIXME restore handling of restricting types:
+      let hyps ← (if only_on then do return new_var.toList ++ hyps
+        else do return (← getLocalHyps).toList ++ hyps)
+      logInfo m!"{hyps}"
+    -- TODO restore handling of restricting types:
     -- let hyps ← (do
     --   let t ← get_restrict_type cfg.restrict_type_reflect
     --   filter_hyps_to_type t hyps) <|>
     --   return hyps
 
-    linarithTraceProofs "linarith is running on the following hypotheses:" hyps
-    -- run_linarith_on_pfs cfg hyps pref_type
+      linarithTraceProofs "linarith is running on the following hypotheses:" hyps
+      run_linarith_on_pfs cfg pref_type g hyps |>.run'
+    failure
+    -- return []
 
 open Parser Tactic
 open Syntax
@@ -408,9 +445,10 @@ Config options:
 -/
 elab_rules : tactic
   | `(tactic| linarith $[$cfg]? $[only%$o]? $[[$args,*]]?) => do
-    tactic.linarith false o.isSome
-      (← ((args.map (TSepArray.getElems)).getD {}).mapM (elabTerm ·.raw none)).toList
-      (← elabLinarithConfig (mkOptionalNode cfg))
+    liftMetaTactic <|
+      tactic.linarith false o.isSome
+        (← ((args.map (TSepArray.getElems)).getD {}).mapM (elabTerm ·.raw none)).toList
+        (← elabLinarithConfig (mkOptionalNode cfg))
 
 set_option trace.linarith true
 
@@ -423,24 +461,21 @@ example (h : 1 < 0) : 3 = 7 := by
   linarith [Nat.zero_lt_one]
   all_goals admit
 
-initialize registerTraceClass `foo
-
-def foo : MetaM (List Bool) := do
-  return (← getLCtx).foldr (fun d L => d.isAuxDecl :: L) []
-
 elab "foo" : tactic => do
-  let L ← foo
-  dbg_trace L
+  let g ← getMainGoal
+  logInfo m!"{g}"
+  sorry
 
-def bar (h : 0 < 1) (g : 37 < 42) : 3 < 7 := by foo
+example : True := by foo
 
--- FIXME We have to repeat all that just to handle the `!`?
+-- TODO We have to repeat all that just to handle the `!`?
 -- Copy doc-string?
 elab_rules : tactic
   | `(tactic| linarith! $[$cfg]? $[only%$o]? $[[$args,*]]?) => do
-    tactic.linarith true o.isSome
-      (← ((args.map (TSepArray.getElems)).getD {}).mapM (elabTerm ·.raw none)).toList
-      (← elabLinarithConfig (mkOptionalNode cfg))
+    liftMetaTactic <|
+      tactic.linarith true o.isSome
+        (← ((args.map (TSepArray.getElems)).getD {}).mapM (elabTerm ·.raw none)).toList
+        (← elabLinarithConfig (mkOptionalNode cfg))
 
 -- add_hint_tactic "linarith"
 

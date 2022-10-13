@@ -37,30 +37,38 @@ For example, if `prf : ¬ a < b`, ``rem_neg prf `(a < b)`` returns a proof of `a
 -/
 def rem_neg (prf : Expr) (e : Expr) : MetaM Expr :=
   match e.getAppFnArgs with
-  | (``LE.le, #[_, _]) => mkAppM ``lt_of_not_ge #[prf]
-  | (``LT.lt, #[_, _]) => mkAppM ``le_of_not_gt #[prf]
-  | (``GT.gt, #[_, _]) => mkAppM ``le_of_not_gt #[prf]
-  | (``GE.ge, #[_, _]) => mkAppM ``lt_of_not_ge #[prf]
+  | (``LE.le, #[_, _, _, _]) => mkAppM ``lt_of_not_ge #[prf]
+  | (``LT.lt, #[_, _, _, _]) => mkAppM ``le_of_not_gt #[prf]
+  | (``GT.gt, #[_, _, _, _]) => mkAppM ``le_of_not_gt #[prf]
+  | (``GE.ge, #[_, _, _, _]) => mkAppM ``lt_of_not_ge #[prf]
   | _ => throwError "Not a comparison"
 
-private def rearr_comp_aux : Expr → Expr → MetaM Expr := sorry
--- | prf `(%%a ≤ 0) := return prf
--- | prf  `(%%a < 0) := return prf
--- | prf  `(%%a = 0) := return prf
--- | prf  `(%%a ≥ 0) := mk_app ``neg_nonpos_of_nonneg [prf]
--- | prf  `(%%a > 0) := mk_app `neg_neg_of_pos [prf]
--- | prf  `(0 ≥ %%a) := to_expr ``(id_rhs (%%a ≤ 0) %%prf)
--- | prf  `(0 > %%a) := to_expr ``(id_rhs (%%a < 0) %%prf)
--- | prf  `(0 = %%a) := mk_app `eq.symm [prf]
--- | prf  `(0 ≤ %%a) := mk_app ``neg_nonpos_of_nonneg [prf]
--- | prf  `(0 < %%a) := mk_app `neg_neg_of_pos [prf]
--- | prf  `(%%a ≤ %%b) := mk_app ``sub_nonpos_of_le [prf]
--- | prf  `(%%a < %%b) := mk_app `sub_neg_of_lt [prf]
--- | prf  `(%%a = %%b) := mk_app `sub_eq_zero_of_eq [prf]
--- | prf  `(%%a > %%b) := mk_app `sub_neg_of_lt [prf]
--- | prf  `(%%a ≥ %%b) := mk_app ``sub_nonpos_of_le [prf]
--- | prf  `(¬ %%t) := do nprf ← rem_neg prf t, tp ← infer_type nprf, rearr_comp_aux nprf tp
--- | prf  a := trace a >> fail "couldn't rearrange comp"
+partial def rearr_comp_aux (proof e : Expr) : MetaM Expr :=
+  match e.getAppFnArgs with
+  | (``LE.le, #[_, _, a, b]) => match a.getAppFnArgs, b.getAppFnArgs with
+    | _, (``OfNat.ofNat, #[_, .lit (.natVal 0), _]) => return proof
+    | (``OfNat.ofNat, #[_, .lit (.natVal 0), _]), _ => mkAppM `neg_nonpos_of_nonneg #[proof]
+    | _, _                                          => mkAppM `sub_nonpos_of_le #[proof]
+  | (``LT.lt, #[_, _, a, b]) => match a.getAppFnArgs, b.getAppFnArgs with
+    | _, (``OfNat.ofNat, #[_, .lit (.natVal 0), _]) => return proof
+    | (``OfNat.ofNat, #[_, .lit (.natVal 0), _]), _ => mkAppM `neg_neg_of_pos #[proof]
+    | _, _                                          => mkAppM `sub_neg_of_lt #[proof]
+  | (``Eq, #[_, a, b]) => match a.getAppFnArgs, b.getAppFnArgs with
+    | _, (``OfNat.ofNat, #[_, .lit (.natVal 0), _]) => return proof
+    | (``OfNat.ofNat, #[_, .lit (.natVal 0), _]), _ => mkAppM `Eq.symm #[proof]
+    | _, _                                          => mkAppM `sub_eq_zero_of_eq #[proof]
+  | (``GT.gt, #[_, _, a, b]) => match a.getAppFnArgs, b.getAppFnArgs with
+    | _, (``OfNat.ofNat, #[_, .lit (.natVal 0), _]) => mkAppM `neg_neg_of_pos #[proof]
+    | (``OfNat.ofNat, #[_, .lit (.natVal 0), _]), _ => mkAppM `lt_zero_of_zero_gt #[proof]
+    | _, _                                          => mkAppM `sub_neg_of_lt #[proof]
+  | (``GE.ge, #[_, _, a, b]) => match a.getAppFnArgs, b.getAppFnArgs with
+    | _, (``OfNat.ofNat, #[_, .lit (.natVal 0), _]) => mkAppM `neg_nonpos_of_nonneg #[proof]
+    | (``OfNat.ofNat, #[_, .lit (.natVal 0), _]), _ => mkAppM `le_zero_of_zero_ge #[proof]
+    | _, _                                          => mkAppM `sub_nonpos_of_le #[proof]
+  | (``Not.intro, #[a]) => do
+    let nproof ← rem_neg proof a
+    rearr_comp_aux nproof (← inferType nproof)
+  | a => throwError m!"couldn't rearrange comp {a}"
 
 /--
 `rearr_comp e` takes a proof `e` of an equality, inequality, or negation thereof,
@@ -70,50 +78,52 @@ def rearr_comp (e : Expr) : MetaM Expr := do
   rearr_comp_aux e (← inferType e)
 
 /-- If `e` is of the form `((n : ℕ) : ℤ)`, `is_nat_int_coe e` returns `n : ℕ`. -/
-def is_nat_int_coe : Expr → Option Expr := sorry
--- | `(@coe ℕ ℤ %%_ %%n) := some n
--- | _ := none
+def is_nat_int_coe (e : Expr) : Option Expr :=
+  match e.getAppFnArgs with
+  | (``Nat.cast, #[.const ``Int [], _, n]) => some n
+  | _ => none
 
 /-- If `e : ℕ`, returns a proof of `0 ≤ (e : ℤ)`. -/
 def mk_coe_nat_nonneg_prf (e : Expr) : MetaM Expr :=
 mkAppM `int.coe_nat_nonneg #[e]
 
 /-- `get_nat_comps e` returns a list of all subexpressions of `e` of the form `((t : ℕ) : ℤ)`. -/
-def get_nat_comps : Expr → List Expr := sorry
--- | `(%%a + %%b) := (get_nat_comps a).append (get_nat_comps b)
--- | `(%%a * %%b) := (get_nat_comps a).append (get_nat_comps b)
--- | e := match is_nat_int_coe e with
---   | some e' := [e']
---   | none := []
---   end
+partial def get_nat_comps (e : Expr) : List Expr :=
+  match is_nat_int_coe e with
+  | some n => [n]
+  | none => match e.getAppFnArgs with
+    | (``HAdd.hAdd, #[_, _, _, _, a, b]) => get_nat_comps a ++ get_nat_comps b
+    | (``HMul.hMul, #[_, _, _, _, a, b]) => get_nat_comps a ++ get_nat_comps b
+    | _ => []
 
 /--
 If `pf` is a proof of a strict inequality `(a : ℤ) < b`,
 `mk_non_strict_int_pf_of_strict_int_pf pf` returns a proof of `a + 1 ≤ b`,
 and similarly if `pf` proves a negated weak inequality.
 -/
-def mk_non_strict_int_pf_of_strict_int_pf (pf : Expr) : MetaM Expr := sorry
--- do tp ← infer_type pf,
--- match tp with
--- | `(%%a < %%b) := to_expr ``(int.add_one_le_iff.mpr %%pf)
--- | `(%%a > %%b) := to_expr ``(int.add_one_le_iff.mpr %%pf)
--- | `(¬ %%a ≤ %%b) := to_expr ``(int.add_one_le_iff.mpr (le_of_not_gt %%pf))
--- | `(¬ %%a ≥ %%b) := to_expr ``(int.add_one_le_iff.mpr (le_of_not_gt %%pf))
--- | _ := fail "mk_non_strict_int_pf_of_strict_int_pf failed: proof is not an inequality"
--- end
+def mk_non_strict_int_pf_of_strict_int_pf (pf : Expr) : MetaM Expr := do
+  match (← inferType pf).getAppFnArgs with
+  | (``LT.lt, #[_, _, _, _]) => return mkApp (← mkAppM ``Iff.mpr #[mkConst ``Int.add_one_le_iff]) pf
+  | (``GT.gt, #[_, _, _, _]) => return mkApp (← mkAppM ``Iff.mpr #[mkConst ``Int.add_one_le_iff]) pf
+  | (``Not.intro, #[P]) => match P.getAppFnArgs with
+    | (``LE.le, #[_, _, _, _]) => return mkApp (← mkAppM ``Iff.mpr #[mkConst ``Int.add_one_le_iff]) (← mkAppM `le_of_not_get #[pf])
+    | (``GE.ge, #[_, _, _, _]) => return mkApp (← mkAppM ``Iff.mpr #[mkConst ``Int.add_one_le_iff]) (← mkAppM `le_of_not_get #[pf])
+    | _ => throwError "mk_non_strict_int_pf_of_strict_int_pf failed: proof is not an inequality"
+  | _ => throwError "mk_non_strict_int_pf_of_strict_int_pf failed: proof is not an inequality"
 
 /--
 `is_nat_prop tp` is true iff `tp` is an inequality or equality between natural numbers
 or the negation thereof.
 -/
-def is_nat_prop : Expr → Bool := sorry
--- | `(@eq ℕ %%_ _) := tt
--- | `(@has_le.le ℕ %%_ _ _) := tt
--- | `(@has_lt.lt ℕ %%_ _ _) := tt
--- | `(@ge ℕ %%_ _ _) := tt
--- | `(@gt ℕ %%_ _ _) := tt
--- | `(¬ %%p) := is_nat_prop p
--- | _ := ff
+partial def is_nat_prop (e : Expr) : Bool :=
+  match e.getAppFnArgs with
+  | (``Eq, #[.const ``Nat [], _, _]) => true
+  | (``LE.le, #[.const ``Nat [], _, _, _]) => true
+  | (``LT.lt, #[.const ``Nat [], _, _, _]) => true
+  | (``GE.ge, #[.const ``Nat [], _, _, _]) => true
+  | (``GT.gt, #[.const ``Nat [], _, _, _]) => true
+  | (``Not.intro, #[e]) => is_nat_prop e
+  | _ => false
 
 /--
 `is_strict_int_prop tp` is true iff `tp` is a strict inequality between integers
@@ -308,15 +318,14 @@ def default_preprocessors : List GlobalBranchingPreprocessor :=
 /--
 `preprocess pps l` takes a list `l` of proofs of propositions.
 It maps each preprocessor `pp ∈ pps` over this list.
-The preprocessors are run sequentially: each recieves the output of the previous one.
+The preprocessors are run sequentially: each receives the output of the previous one.
 Note that a preprocessor may produce multiple or no expressions from each input expression,
 so the size of the list may change.
 -/
-def preprocess (pps : List GlobalBranchingPreprocessor) (l : List Expr) :
-    TacticM (List Branch) := do
-  let g ← getMainGoal
+def preprocess (pps : List GlobalBranchingPreprocessor) (g : MVarId) (l : List Expr) :
+    MetaM (List Branch) := do
   pps.foldlM (fun ls pp =>
-    List.join <$> (ls.mapM $ fun b => do setGoals [b.1]; pp.process b.2))
+    List.join <$> (ls.mapM $ fun b => do pp.process b.1 b.2))
     [(g, l)]
 
 end Linarith

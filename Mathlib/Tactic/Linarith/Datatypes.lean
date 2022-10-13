@@ -28,13 +28,13 @@ initialize registerTraceClass `linarith
 
 namespace Linarith
 
-/-- A shorthand for tracing when the `trace.Tactic.linarith` option is set to true. -/
+/-- A shorthand for tracing when the `trace.linarith` option is set to true. -/
 def linarithTrace {α} [ToMessageData α] (s : α) : CoreM Unit := do
   trace[linarith] "{s}"
 
 /--
 A shorthand for tracing the types of a list of proof terms
-when the `trace.Tactic.linarith` option is set to true.
+when the `trace.linarith` option is set to true.
 -/
 def linarithTraceProofs (s : String := "") (l : List Expr) : MetaM Unit := do
   trace[linarith] s
@@ -225,13 +225,13 @@ instance Comp.ToFormat : ToFormat Comp :=
 
 /--
 A preprocessor transforms a proof of a proposition into a proof of a different propositon.
-The return type is `List FVarId`, since some preprocessing steps may create multiple new hypotheses,
+The return type is `List Expr`, since some preprocessing steps may create multiple new hypotheses,
 and some may remove a hypothesis from the list.
 A "no-op" preprocessor should return its input as a singleton list.
 -/
 structure Preprocessor : Type :=
   (name : String)
-  (transform : Expr → TacticM (List Expr)) -- FIXME which monad is appropriate here?
+  (transform : Expr → MetaM (List Expr)) -- FIXME which monad is appropriate here?
 
 /--
 Some preprocessors need to examine the full list of hypotheses instead of working item by item.
@@ -240,7 +240,7 @@ output.
 -/
 structure GlobalPreprocessor : Type :=
   (name : String)
-  (transform : List Expr → TacticM (List Expr)) -- FIXME which monad is appropriate here?
+  (transform : List Expr → MetaM (List Expr)) -- FIXME which monad is appropriate here?
 
 /--
 Some preprocessors perform branching case splits. A `Branch` is used to track one of these case
@@ -259,7 +259,7 @@ metavariable.
 -/
 structure GlobalBranchingPreprocessor : Type :=
   (name : String)
-  (transform : List Expr → TacticM (List Branch)) -- FIXME which monad is appropriate here?
+  (transform : MVarId → List Expr → MetaM (List Branch)) -- FIXME which monad is appropriate here?
 
 /--
 A `Preprocessor` lifts to a `GlobalPreprocessor` by folding it over the input list.
@@ -273,20 +273,20 @@ A `GlobalPreprocessor` lifts to a `GlobalBranchingPreprocessor` by producing onl
 -/
 def GlobalPreprocessor.branching (pp : GlobalPreprocessor) : GlobalBranchingPreprocessor :=
 { name := pp.name,
-  transform := fun l => do return [⟨← getMainGoal, ← pp.transform l⟩] }
+  transform := fun g l => do return [⟨g, ← pp.transform l⟩] }
 
 /--
 `process pp l` runs `pp.transform` on `l` and returns the result,
 tracing the result if `trace.linarith` is on.
 -/
 def GlobalBranchingPreprocessor.process (pp : GlobalBranchingPreprocessor)
-  (l : List Expr) : TacticM (List Branch) := do
-  let branches ← pp.transform l
+  (g : MVarId) (l : List Expr) : MetaM (List Branch) := do
+  let branches ← pp.transform g l
   if (branches.length > 1) then
     linarithTrace (format "Preprocessing: {pp.name} has branched, with branches:")
   for ⟨goal, hyps⟩ in branches do
-    setGoals [goal]
-    linarithTraceProofs (toString (format "Preprocessing: {pp.name}")) hyps
+    goal.withContext do
+      linarithTraceProofs (toString (format "Preprocessing: {pp.name}")) hyps
   return branches
 
 instance PreprocessorToGlobalBranchingPreprocessor :
@@ -300,7 +300,7 @@ instance GlobalPreprocessorToGlobalBranchingPreprocessor :
 
 /--
 A `CertificateOracle` is a function
-`produceCertificate : List Comp → Nat → TacticM (HashMap Nat Nat)`.
+`produceCertificate : List Comp → Nat → MetaM (HashMap Nat Nat)`.
 `produceCertificate hyps max_var` tries to derive a contradiction from the comparisons in `hyps`
 by eliminating all variables ≤ `max_var`.
 If successful, it returns a map `coeff : Nat → Nat` as a certificate.
@@ -310,7 +310,7 @@ The default `CertificateOracle` used by `linarith` is
 `Linarith.FourierMotzkin.produceCertificate`.
 -/
 def CertificateOracle : Type :=
-  List Comp → Nat → TacticM (Std.HashMap Nat Nat)
+  List Comp → Nat → TermElabM (Std.HashMap Nat Nat) -- FIXME which monad?
 
 open Meta
 
