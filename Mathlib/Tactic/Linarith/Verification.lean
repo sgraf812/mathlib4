@@ -193,12 +193,12 @@ def proveFalseByLinarith (cfg : LinarithConfig) : MVarId → List Expr → TermE
     let hz ← mk_neg_one_lt_zero_pf (← ineq_prf_tp h)
     let inputs := hz::l'
     linarithTraceProofs "mk_neg_one_lt_zero_pf" inputs
-    -- -- perform the elimination and fail if no contradiction is found.
-    -- let (comps, max_var) ← linearFormsAndMaxVar cfg.transparency inputs
-    -- logInfo m!"{comps}"
-    -- logInfo m!"{max_var}"
-    let oracle := cfg.oracle.getD FourierMotzkin.produceCertificate
+    -- perform the elimination and fail if no contradiction is found.
+    let (comps, max_var) ← linearFormsAndMaxVar cfg.transparency inputs
+    linarithTrace m!"comps {comps}"
+    linarithTrace m!"max_var {max_var}"
     return mkConst `Nat.zero
+    -- let oracle := cfg.oracle.getD FourierMotzkin.produceCertificate
     -- throwError "hello world"
     -- let certificate : Std.HashMap Nat Nat ← oracle comps max_var
     --   <|> throwError "linarith failed to find a contradiction"

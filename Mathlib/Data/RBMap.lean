@@ -17,7 +17,3 @@ match self.find? a with
 | some L => self.insert a (b::L)
 
 end Std.HashMap
-
-namespace Std.RBMap
-
-instance [DecidableEq β] : DecidableEq (RBMap α β cmp) := sorry

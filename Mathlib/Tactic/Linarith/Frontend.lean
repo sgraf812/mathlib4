@@ -382,11 +382,6 @@ do
     In this case we also receive a new variable from moving the goal to a hypothesis.
     Otherwise, there is no preferred type and no new variable; we simply change the goal to `false`.
   -/
-    linarithTrace "before apply_contr_lemma"
-    g.withContext do
-      for f in ← getLCtx do
-        if !f.isImplementationDetail then
-          linarithTrace (← inferType f.toExpr)
 
     -- TODO can we rename liftMetaTacticAux?
     -- TODO do this with a match

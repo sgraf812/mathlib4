@@ -54,7 +54,7 @@ fun a b =>
   ((a.keys : List ℕ) < b.keys) || (((a.keys : List ℕ) = b.keys) && ((a.values : List ℕ) < b.values))
 
 instance : Ord Monom where
-  compare x y := if x.lt y then .lt else if x = y then .eq else .gt
+  compare x y := if x.lt y then .lt else if x == y then .eq else .gt
 
 /-- Linear combinations of monomials are represented by mapping monomials to coefficients. -/
 @[reducible] def Sum : Type := Map Monom ℤ
@@ -223,5 +223,17 @@ def linearFormsAndMaxVar (red : TransparencyMode) (pfs : List Expr) :
   let pftps ← (pfs.mapM inferType).run'
   let (l, _, map) ← toCompFold red [] pftps RBMap.empty
   return (l, map.size - 1)
+
+axiom α : Type
+@[instance] axiom i : OrderedRing α
+axiom a : α
+axiom b : α
+axiom h₁ : a + 2 * b = 0
+axiom h₂ : a - b = 0
+
+#eval linearFormsAndMaxVar .default []
+#eval linearFormsAndMaxVar .default [q(h₁)]
+#eval linearFormsAndMaxVar .default [q(h₂)]
+#eval linearFormsAndMaxVar .default [q(h₁), q(h₂)]
 
 end Linarith

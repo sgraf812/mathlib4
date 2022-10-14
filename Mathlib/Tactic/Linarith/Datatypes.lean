@@ -125,7 +125,7 @@ end Linexp
 terms. -/
 inductive Ineq : Type
 | eq | le | lt
-deriving DecidableEq, Inhabited
+deriving DecidableEq, Inhabited, Repr
 
 namespace Ineq
 
@@ -180,7 +180,7 @@ str determines the strength of the comparison -- is it < 0, ≤ 0, or = 0?
 structure Comp : Type :=
   (str : Ineq)
   (coeffs : Linexp)
-deriving Inhabited
+deriving Inhabited, Repr
 
 /-- `c.vars` returns the list of variables that appear in the linear expression contained in `c`. -/
 def Comp.vars : Comp → List Nat := Linexp.vars ∘ Comp.coeffs

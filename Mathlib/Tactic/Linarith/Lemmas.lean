@@ -46,7 +46,12 @@ theorem neg_nonpos_of_nonneg [OrderedAddCommGroup α] {a : α} : 0 ≤ a → -a 
 
 theorem neg_neg_of_pos [OrderedAddCommGroup α] {a : α} : 0 < a → -a < 0 := sorry
 
-
+-- see Note [lower instance priority]
+instance (priority := 100) OrderedRing.toOrderedSemiring [OrderedRing α] : OrderedSemiring α :=
+  { ‹OrderedRing α›, (Ring.toSemiring : Semiring α) with
+    le_of_add_le_add_left := sorry,
+    mul_lt_mul_of_pos_left := sorry,
+    mul_lt_mul_of_pos_right := sorry }
 
 -- These can be deleted. They are just "tests" that we're finding expected instances
 
