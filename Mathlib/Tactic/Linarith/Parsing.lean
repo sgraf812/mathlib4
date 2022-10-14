@@ -133,32 +133,62 @@ It matches atomic expressions up to reducibility given by `red`.
 Because it matches up to definitional equality, this function must be in the `MetaM` monad,
 and forces some functions that call it into `MetaM` as well.
 -/
--- The usage of the QQ library here follows the example at
--- https://github.com/gebner/quote4/blob/master/examples/matching.lean
-partial def linearFormOfExpr (red : TransparencyMode) (m : ExprMap)
-    {α : Q(Type $u)} (inst : Q(Ring $α)) : Q($α) → MetaM (ExprMap × Sum)
-| ~q($e1 * $e2) => do
-    let (m1, comp1) ← linearFormOfExpr red m inst e1
-    let (m2, comp2) ← linearFormOfExpr red m1 inst e2
+-- -- The usage of the QQ library here follows the example at
+-- -- https://github.com/gebner/quote4/blob/master/examples/matching.lean
+-- partial def linearFormOfExpr (red : TransparencyMode) (m : ExprMap)
+--     {α : Q(Type $u)} (inst : Q(Ring $α)) : Q($α) → MetaM (ExprMap × Sum)
+-- | ~q($e1 * $e2) => do
+--     let (m1, comp1) ← linearFormOfExpr red m inst e1
+--     let (m2, comp2) ← linearFormOfExpr red m1 inst e2
+--     return (m2, comp1.mul comp2)
+-- | ~q($e1 + $e2) => do
+--     let (m1, comp1) ← linearFormOfExpr red m inst e1
+--     let (m2, comp2) ← linearFormOfExpr red m1 inst e2
+--     return (m2, comp1 + comp2)
+-- | ~q($e1 - $e2) => do
+--     let (m1, comp1) ← linearFormOfExpr red m inst e1
+--     let (m2, comp2) ← linearFormOfExpr red m1 inst e2
+--     return (m2, comp1 + comp2.mapVal (fun _ v => -v))
+-- | ~q(-$e) => do
+--     let (m1, comp) ← linearFormOfExpr red m inst e
+--     return (m1, comp.mapVal (fun _ v => -v))
+-- | ~q($e ^ ($n : ℕ)) => do
+--     let (m1, comp) ← linearFormOfExpr red m inst e
+--     return (m1, comp.pow n.natLit!)
+-- | ~q((OfNat.ofNat $n : $α)) => match n.natLit! with
+--     | 0 => return ⟨m, RBMap.empty⟩
+--     | n => return ⟨m, scalar n⟩
+-- | e => linearFormOfAtom red m e
+
+partial def linearFormOfExpr (red : TransparencyMode) (m : ExprMap) (e : Expr) :
+    MetaM (ExprMap × Sum) :=
+  match e.numeral? with
+  | some 0 => return ⟨m, RBMap.empty⟩
+  | some (n+1) => return ⟨m, scalar (n+1)⟩
+  | none =>
+  match e.getAppFnArgs with
+  | (``HMul.hMul, #[_, _, _, _, e1, e2]) => do
+    let (m1, comp1) ← linearFormOfExpr red m e1
+    let (m2, comp2) ← linearFormOfExpr red m1 e2
     return (m2, comp1.mul comp2)
-| ~q($e1 + $e2) => do
-    let (m1, comp1) ← linearFormOfExpr red m inst e1
-    let (m2, comp2) ← linearFormOfExpr red m1 inst e2
+  | (``HAdd.hAdd, #[_, _, _, _, e1, e2]) => do
+    let (m1, comp1) ← linearFormOfExpr red m e1
+    let (m2, comp2) ← linearFormOfExpr red m1 e2
     return (m2, comp1 + comp2)
-| ~q($e1 - $e2) => do
-    let (m1, comp1) ← linearFormOfExpr red m inst e1
-    let (m2, comp2) ← linearFormOfExpr red m1 inst e2
+  | (``HSub.hSub, #[_, _, _, _, e1, e2]) => do
+    let (m1, comp1) ← linearFormOfExpr red m e1
+    let (m2, comp2) ← linearFormOfExpr red m1 e2
     return (m2, comp1 + comp2.mapVal (fun _ v => -v))
-| ~q(-$e) => do
-    let (m1, comp) ← linearFormOfExpr red m inst e
+  | (``Neg.neg, #[_, _, e]) => do
+    let (m1, comp) ← linearFormOfExpr red m e
     return (m1, comp.mapVal (fun _ v => -v))
-| ~q($e ^ ($n : ℕ)) => do
-    let (m1, comp) ← linearFormOfExpr red m inst e
-    return (m1, comp.pow n.natLit!)
-| ~q((OfNat.ofNat $n : $α)) => match n.natLit! with
-    | 0 => return ⟨m, RBMap.empty⟩
-    | n => return ⟨m, scalar n⟩
-| e => linearFormOfAtom red m e
+  | (``HPow.hPow, #[_, _, _, _, e, n]) => do
+    match n.numeral? with
+    | some n => do
+      let (m1, comp) ← linearFormOfExpr red m e
+      return (m1, comp.pow n)
+    | none => linearFormOfAtom red m e
+  | _ => linearFormOfAtom red m e
 
 /--
 `elimMonom s map` eliminates the monomial level of the `Sum` `s`.
@@ -193,9 +223,10 @@ Both of these are updated during processing and returned.
 def toComp (red : TransparencyMode) (e : Expr) (e_map : ExprMap) (monom_map : Map Monom ℕ) :
     MetaM (Comp × ExprMap × Map Monom ℕ) := do
   let (iq, e) ← parseCompAndExpr e
-  let ⟨u, α, e⟩ ← inferTypeQ' e
-  let inst : Q(Add $α) ← synthInstanceQ q(Add $α)
-  let (m', comp') ← linearFormOfExpr red e_map inst e
+  -- TODO discard
+  -- let ⟨u, α, e⟩ ← inferTypeQ' e
+  -- let inst : Q(Add $α) ← synthInstanceQ q(Add $α)
+  let (m', comp') ← linearFormOfExpr red e_map e
   let ⟨nm, mm'⟩ := elimMonom comp' monom_map
   return ⟨⟨iq, mm'.toList⟩, m', nm⟩
 
@@ -228,12 +259,20 @@ axiom α : Type
 @[instance] axiom i : OrderedRing α
 axiom a : α
 axiom b : α
-axiom h₁ : a + 2 * b = 0
-axiom h₂ : a - b = 0
 
 #eval linearFormsAndMaxVar .default []
-#eval linearFormsAndMaxVar .default [q(h₁)]
-#eval linearFormsAndMaxVar .default [q(h₂)]
+#eval linearFormsAndMaxVar .default [q((sorry : a + 2 * b = 0))]
+#eval linearFormsAndMaxVar .default [q((sorry : a + 2 * b + 3 * a + 4 * b = 0))]
+#eval linearFormsAndMaxVar .default [q((sorry : -b = 0))]
+#eval linearFormsAndMaxVar .default [q((sorry : -(a + b) = 0))]
+#eval linearFormsAndMaxVar .default [q((sorry : a - b = 0))]
+#eval linearFormsAndMaxVar .default [q((sorry : (a - b)^2 = 0))]
+#eval linearFormsAndMaxVar .default [q((sorry : (a - b)*(a+b) + (a+b)*(b - a) = 0))]
+
+axiom h₁ : a + 2 * b = 0
+axiom h₂ : - b = 0
+axiom h₃ : a - b = 0
+
 #eval linearFormsAndMaxVar .default [q(h₁), q(h₂)]
 
 end Linarith
