@@ -124,7 +124,7 @@ def ineq_prf_tp (prf : Expr) : MetaM Expr := do
 where the numerals are natively of type `tp`.
 -/
 def mk_neg_one_lt_zero_pf (tp : Expr) : MetaM Expr := do
-  let zero_lt_one ← mkAppOptM `zero_lt_one #[tp, none, none]
+  let zero_lt_one ← mkAppOptM ``zero_lt_one #[tp, none, none]
   mkAppM `neg_neg_of_pos #[zero_lt_one]
 
 /--
@@ -187,16 +187,19 @@ def proveFalseByLinarith (cfg : LinarithConfig) : MVarId → List Expr → TermE
 | g, l@(h::_) => do
     -- for the elimination to work properly, we must add a proof of `-1 < 0` to the list,
     -- along with negated equality proofs.
-    logInfo m!"waking up in proveFalseByLinarith with {l}"
-    -- let l' ← add_neg_eq_pfs l
-    -- let hz ← mk_neg_one_lt_zero_pf (← ineq_prf_tp h)
-    -- let inputs := hz::l'
+    linarithTraceProofs "waking up in proveFalseByLinarith" l
+    let l' ← add_neg_eq_pfs l
+    linarithTraceProofs "add_neg_eq_pfs" l
+    let hz ← mk_neg_one_lt_zero_pf (← ineq_prf_tp h)
+    let inputs := hz::l'
+    linarithTraceProofs "mk_neg_one_lt_zero_pf" inputs
     -- -- perform the elimination and fail if no contradiction is found.
     -- let (comps, max_var) ← linearFormsAndMaxVar cfg.transparency inputs
     -- logInfo m!"{comps}"
     -- logInfo m!"{max_var}"
-    -- let oracle := cfg.oracle.getD FourierMotzkin.produceCertificate
-    throwError "hello world"
+    let oracle := cfg.oracle.getD FourierMotzkin.produceCertificate
+    return mkConst `Nat.zero
+    -- throwError "hello world"
     -- let certificate : Std.HashMap Nat Nat ← oracle comps max_var
     --   <|> throwError "linarith failed to find a contradiction"
     -- linarithTrace "linarith has found a contradiction"

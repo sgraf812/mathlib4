@@ -461,7 +461,9 @@ set_option trace.linarith true
 
 open Function
 
-example [LinearOrderedAddCommGroup α] {a b : α} (h : a < b) (w : b < a) : False := by
+example [OrderedRing α] [Nontrivial α] : (0 : α) < 1 := zero_lt_one
+
+example [OrderedRing α] [Nontrivial α] {a b : α} (h : a < b) (w : b < a) : False := by
   -- apply eq_of_not_lt_of_not_gt
   linarith
 
