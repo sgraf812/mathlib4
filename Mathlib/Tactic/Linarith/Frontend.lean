@@ -6,6 +6,7 @@ Authors: Robert Y. Lewis
 
 import Mathlib.Tactic.Linarith.Verification
 import Mathlib.Tactic.Linarith.Preprocessing
+import Mathlib.Algebra.CovariantAndContravariant
 
 /-!
 # `linarith`: solving linear arithmetic goals
@@ -458,6 +459,41 @@ elab_rules : tactic
         (← elabLinarithConfig (mkOptionalNode cfg))
 
 set_option trace.linarith true
+
+open Function
+
+example {α} [LinearOrderedAddCommGroup α] : OrderedAddCommGroup α :=
+  LinearOrderedAddCommGroup.toOrderedAddCommGroup
+
+example {α} [OrderedAddCommGroup α] : AddCommGroup α :=
+  OrderedAddCommGroup.toAddCommGroup
+
+example {α} [AddCommGroup α] : AddGroup α :=
+  AddCommGroup.toAddGroup
+
+example {α} [AddGroup α] : AddCancelMonoid α :=
+  AddGroup.toAddCancelMonoid
+
+example {α} [AddCancelMonoid α] : AddRightCancelMonoid α :=
+  AddCancelMonoid.toAddRightCancelMonoid
+
+example {α} [AddRightCancelMonoid α] : AddRightCancelSemigroup α :=
+  AddRightCancelMonoid.toAddRightCancelSemigroup
+
+example {α} [OrderedAddCommGroup α] : OrderedCancelAddCommMonoid α :=
+  OrderedAddCommGroup.toOrderedCancelAddCommMonoid
+
+example {α} [OrderedCancelAddCommMonoid α] : OrderedAddCommMonoid α :=
+  OrderedCancelAddCommMonoid.toOrderedAddCommMonoid
+
+example {α} [OrderedAddCommMonoid α] : CovariantClass α α (swap (· + ·)) (· ≤ ·) :=
+  OrderedAddCommMonoid.toCovariantClassRight α
+
+example {α} [OrderedAddCommGroup α] : PartialOrder α :=
+  OrderedAddCommGroup.toPartialOrder
+
+example {α} [AddRightCancelSemigroup α] [PartialOrder α] [CovariantClass α α (swap (· + ·)) (· ≤ ·)] : CovariantClass α α (swap (· + ·)) (· < ·) :=
+  AddRightCancelSemigroup.covariant_swap_add_lt_of_covariant_swap_add_le α
 
 example [LinearOrderedAddCommGroup α] {a b : α} (h : a < b) (w : b < a) : False := by
   -- apply eq_of_not_lt_of_not_gt
