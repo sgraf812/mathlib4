@@ -197,29 +197,37 @@ def proveFalseByLinarith (cfg : LinarithConfig) : MVarId → List Expr → TermE
     let (comps, max_var) ← linearFormsAndMaxVar cfg.transparency inputs
     linarithTrace m!"comps {comps}"
     linarithTrace m!"max_var {max_var}"
-    return mkConst `Nat.zero
-    -- let oracle := cfg.oracle.getD FourierMotzkin.produceCertificate
-    -- throwError "hello world"
-    -- let certificate : Std.HashMap Nat Nat ← oracle comps max_var
-    --   <|> throwError "linarith failed to find a contradiction"
-    -- linarithTrace "linarith has found a contradiction"
-    -- let enum_inputs := inputs.enum
-    -- -- construct a list pairing nonzero coeffs with the proof of their corresponding comparison
-    -- let zip := enum_inputs.filterMap (fun ⟨n, e⟩ => (certificate.find? n).map (e, ·))
-    -- let mls ← zip.mapM (fun ⟨e, n⟩ => do mulExpr n (← term_of_ineq_prf e))
-    -- -- `sm` is the sum of input terms, scaled to cancel out all variables.
-    -- let sm ← addExprs mls -- FIXME there was a to_expr here previously
-    -- linarithTrace "The expression\n  {sm}\nshould be both 0 and negative"
-    -- -- we prove that `sm = 0`, typically with `ring`.
-    -- let sm_eq_zero ← prove_eq_zero_using cfg.discharger sm
-    -- linarithTrace "We have proved that it is zero"
-    -- -- we also prove that `sm < 0`.
-    -- let sm_lt_zero ← mk_lt_zero_pf zip
-    -- linarithTrace "We have proved that it is negative"
-    -- -- this is a contradiction.
-    -- let pftp ← inferType sm_lt_zero
-    -- let ⟨_, nep, _⟩ ← g.rewrite sm_eq_zero pftp
-    -- let pf' ← mkAppM ``Eq.mp #[nep, sm_lt_zero]
-    -- mkAppM `lt_irrefl #[pf']
+    let oracle := cfg.oracle.getD FourierMotzkin.produceCertificate
+    let certificate : Std.HashMap Nat Nat ← oracle comps max_var
+      <|> throwError "linarith failed to find a contradiction"
+    linarithTrace "linarith has found a contradiction"
+    linarithTrace m!"{certificate.toList}"
+    let enum_inputs := inputs.enum
+    -- construct a list pairing nonzero coeffs with the proof of their corresponding comparison
+    let zip := enum_inputs.filterMap (fun ⟨n, e⟩ => (certificate.find? n).map (e, ·))
+    let mls ← zip.mapM (fun ⟨e, n⟩ => do mulExpr n (← term_of_ineq_prf e))
+    -- `sm` is the sum of input terms, scaled to cancel out all variables.
+    let sm ← addExprs mls -- FIXME there was a to_expr here previously
+    linarithTrace m!"The expression\n  {sm}\nshould be both 0 and negative"
+    -- we prove that `sm = 0`, typically with `ring`.
+    let sm_eq_zero ← prove_eq_zero_using cfg.discharger sm
+    linarithTrace "We have proved that it is zero"
+    -- we also prove that `sm < 0`.
+    let sm_lt_zero ← mk_lt_zero_pf zip
+    linarithTrace "We have proved that it is negative"
+    -- this is a contradiction.
+    let pftp ← inferType sm_lt_zero
+    let ⟨_, nep, _⟩ ← g.rewrite sm_eq_zero pftp
+    let pf' ← mkAppM ``Eq.mp #[nep, sm_lt_zero]
+    mkAppM `lt_irrefl #[pf']
+
+
+axiom β : Type
+@[instance] axiom j : CommRing β
+axiom x : β
+
+example : x - x = 0 := by ring
+
+#eval prove_eq_zero_using (do evalTactic (← `(tactic| ring))) q(x - x)
 
 end Linarith
