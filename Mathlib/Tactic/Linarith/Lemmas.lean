@@ -40,3 +40,61 @@ theorem sub_neg_of_lt [AddGroup α] [LT α] [CovariantClass α α (swap (· + ·
 theorem neg_nonpos_of_nonneg [OrderedAddCommGroup α] {a : α} : 0 ≤ a → -a ≤ 0 := sorry
 
 theorem neg_neg_of_pos [OrderedAddCommGroup α] {a : α} : 0 < a → -a < 0 := sorry
+
+
+
+-- These can be deleted. They are just "tests" that we're finding expected instances
+
+example {α} [LinearOrderedAddCommGroup α] : OrderedAddCommGroup α :=
+  inferInstance
+  -- LinearOrderedAddCommGroup.toOrderedAddCommGroup
+
+example {α} [OrderedAddCommGroup α] : AddCommGroup α :=
+  inferInstance
+  -- OrderedAddCommGroup.toAddCommGroup
+
+example {α} [AddCommGroup α] : AddGroup α :=
+  inferInstance
+  -- AddCommGroup.toAddGroup
+
+example {α} [AddGroup α] : AddCancelMonoid α :=
+  inferInstance
+  -- AddGroup.toAddCancelMonoid
+
+example {α} [AddCancelMonoid α] : AddRightCancelMonoid α :=
+  inferInstance
+  -- AddCancelMonoid.toAddRightCancelMonoid
+
+example {α} [AddRightCancelMonoid α] : AddRightCancelSemigroup α :=
+  inferInstance
+  -- AddRightCancelMonoid.toAddRightCancelSemigroup
+
+example {α} [OrderedAddCommGroup α] : OrderedCancelAddCommMonoid α :=
+  inferInstance
+  -- OrderedAddCommGroup.toOrderedCancelAddCommMonoid
+
+example {α} [OrderedCancelAddCommMonoid α] : OrderedAddCommMonoid α :=
+  inferInstance
+  -- OrderedCancelAddCommMonoid.toOrderedAddCommMonoid
+
+example {α} [LinearOrderedAddCommGroup α] : OrderedAddCommMonoid α :=
+  inferInstance
+  -- OrderedCancelAddCommMonoid.toOrderedAddCommMonoid
+
+example {α} [OrderedAddCommMonoid α] : CovariantClass α α (swap (· + ·)) (· ≤ ·) :=
+  -- inferInstance
+  OrderedAddCommMonoid.to_covariant_class_right α
+
+example {α} [LinearOrderedAddCommGroup α] : CovariantClass α α (swap (· + ·)) (· ≤ ·) :=
+  OrderedAddCommMonoid.to_covariant_class_right α
+
+example {α} [OrderedAddCommGroup α] : PartialOrder α :=
+  OrderedAddCommGroup.toPartialOrder
+
+example {α} [AddRightCancelSemigroup α] [PartialOrder α] [CovariantClass α α (swap (· + ·)) (· ≤ ·)] :
+    CovariantClass α α (swap (· + ·)) (· < ·) :=
+  AddRightCancelSemigroup.covariant_swap_add_lt_of_covariant_swap_add_le α
+
+example {α} [LinearOrderedAddCommGroup α] :
+    CovariantClass α α (swap (· + ·)) (· < ·) :=
+  AddRightCancelSemigroup.covariant_swap_add_lt_of_covariant_swap_add_le α

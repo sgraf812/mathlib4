@@ -1,4 +1,5 @@
 import Mathlib.Algebra.Group.Basic
+import Mathlib.Algebra.Order.Monoid
 import Mathlib.Algebra.Order.MonoidLemmas
 
 open Function
@@ -7,6 +8,26 @@ open Function
 with a partial order in which addition is strictly monotone. -/
 class OrderedAddCommGroup (α : Type u) extends AddCommGroup α, PartialOrder α where
   add_le_add_left : ∀ a b : α, a ≤ b → ∀ c : α, c + a ≤ c + b
+
+/-- An ordered commutative group is an commutative group
+with a partial order in which multiplication is strictly monotone. -/
+class OrderedCommGroup (α : Type u) extends CommGroup α, PartialOrder α where
+  mul_le_mul_left : ∀ a b : α, a ≤ b → ∀ c : α, c * a ≤ c * b
+
+attribute [to_additive OrderedAddCommGroup] OrderedCommGroup
+
+@[to_additive]
+instance OrderedCommGroup.to_covariant_class_left_le [OrderedCommGroup α] :
+    CovariantClass α α (· * ·) (· ≤ ·) where
+  elim := fun a b c bc => OrderedCommGroup.mul_le_mul_left b c bc a
+
+-- see Note [lower instance priority]
+@[to_additive OrderedAddCommGroup.toOrderedCancelAddCommMonoid]
+instance (priority := 100) OrderedCommGroup.toOrderedCancelCommMonoid [s : OrderedCommGroup α] :
+    OrderedCancelCommMonoid α :=
+  { s with le_of_mul_le_mul_left := fun a _ _ => (mul_le_mul_iff_left a).mp }
+
+attribute [instance] OrderedAddCommGroup.toOrderedCancelAddCommMonoid
 
 section Group
 variable [Group α] [LT α]
