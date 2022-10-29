@@ -14,8 +14,6 @@ import Mathlib.Mathport.Attributes
 import Mathlib.Mathport.Rename
 import Mathlib.Tactic.Relation.Trans
 
-universe u v w
-
 #align opt_param_eq optParam_eq
 
 /- Implication -/
@@ -43,17 +41,15 @@ alias proofIrrel ← proof_irrel
 alias congrFun ← congr_fun
 alias congrArg ← congr_arg
 
-@[deprecated] theorem trans_rel_left {α : Sort u} {a b c : α} (r : α → α → Prop)
-    (h₁ : r a b) (h₂ : b = c) : r a c :=
-  h₂ ▸ h₁
+@[deprecated] theorem trans_rel_left {α : Sort u} {a b c : α}
+    (r : α → α → Prop) (h₁ : r a b) (h₂ : b = c) : r a c := h₂ ▸ h₁
 
-@[deprecated] theorem trans_rel_right {α : Sort u} {a b c : α} (r : α → α → Prop)
-    (h₁ : a = b) (h₂ : r b c) : r a c :=
-  h₁.symm ▸ h₂
+@[deprecated] theorem trans_rel_right {α : Sort u} {a b c : α}
+    (r : α → α → Prop) (h₁ : a = b) (h₂ : r b c) : r a c := h₁.symm ▸ h₂
 
 theorem not_of_eq_false {p : Prop} (h : p = False) : ¬p := fun hp => h ▸ hp
 
-theorem cast_proof_irrel {α β : Sort u} (h₁ h₂ : α = β) (a : α) : cast h₁ a = cast h₂ a := rfl
+theorem cast_proof_irrel (h₁ h₂ : α = β) (a : α) : cast h₁ a = cast h₂ a := rfl
 
 #align eq_true_intro eq_true
 #align eq_false_intro eq_false
@@ -62,7 +58,6 @@ theorem cast_proof_irrel {α β : Sort u} (h₁ h₂ : α = β) (a : α) : cast 
 
 /- Ne -/
 
-@[simp]
 theorem Ne.def {α : Sort u} (a b : α) : (a ≠ b) = ¬a = b := rfl
 
 attribute [symm] Ne.symm
@@ -93,6 +88,7 @@ theorem eq_rec_compose {α β φ : Sort u} :
   | rfl, rfl, _ => rfl
 
 /- and -/
+
 variable {a b c d : Prop}
 
 #align and.symm And.symm
@@ -282,8 +278,6 @@ theorem decide_False' (h : Decidable False) : decide False = false := by simp
 
 namespace Decidable
 
-variable {p q : Prop}
-
 def recOn_true [h : Decidable p] {h₁ : p → Sort u} {h₂ : ¬p → Sort u}
     (h₃ : p) (h₄ : h₁ h₃) : Decidable.recOn h h₂ h₁ :=
   cast (by match h with | .isTrue _ => rfl) h₄
@@ -311,8 +305,6 @@ instance [Decidable p] [Decidable q] : Decidable (Xor' p q) := inferInstanceAs (
 
 def IsDecEq {α : Sort u} (p : α → α → Bool) : Prop := ∀ ⦃x y : α⦄, p x y = true → x = y
 def IsDecRefl {α : Sort u} (p : α → α → Bool) : Prop := ∀ x, p x x = true
-
-open Decidable
 
 def decidable_eq_of_bool_pred {α : Sort u} {p : α → α → Bool} (h₁ : IsDecEq p)
     (h₂ : IsDecRefl p) : DecidableEq α
@@ -478,6 +470,7 @@ theorem InvImage.irreflexive (f : α → β) (h : Irreflexive r) : Irreflexive (
   fun (a : α) (h₁ : InvImage r f a a) => h (f a) h₁
 
 end Relation
+
 section Binary
 
 variable {α : Type u} {β : Type v} (f : α → α → α) (inv : α → α) (one : α)
