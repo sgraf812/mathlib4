@@ -45,7 +45,7 @@ alias congrArg ← congr_arg
     (r : α → α → Prop) (h₁ : r a b) (h₂ : b = c) : r a c := h₂ ▸ h₁
 
 @[deprecated] theorem trans_rel_right {α : Sort u} {a b c : α}
-    (r : α → α → Prop) (h₁ : a = b) (h₂ : r b c) : r a c := h₁.symm ▸ h₂
+    (r : α → α → Prop) (h₁ : a = b) (h₂ : r b c) : r a c := h₁ ▸ h₂
 
 theorem not_of_eq_false {p : Prop} (h : p = False) : ¬p := fun hp => h ▸ hp
 
@@ -58,7 +58,7 @@ theorem cast_proof_irrel (h₁ h₂ : α = β) (a : α) : cast h₁ a = cast h�
 
 /- Ne -/
 
-theorem Ne.def {α : Sort u} (a b : α) : (a ≠ b) = ¬a = b := rfl
+theorem Ne.def {α : Sort u} (a b : α) : (a ≠ b) = ¬ (a = b) := rfl
 
 attribute [symm] Ne.symm
 
