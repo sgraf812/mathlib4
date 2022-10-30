@@ -200,6 +200,11 @@ instance (priority := 100) StrictOrderedRing.toStrictOrderedSemiring : StrictOrd
     mul_lt_mul_of_pos_left := sorry,
     mul_lt_mul_of_pos_right := sorry }
 
+
+-- see Note [lower instance priority]
+instance (priority := 100) StrictOrderedRing.toOrderedRing : OrderedRing α :=
+  { ‹StrictOrderedRing α› with }
+
 end StrictOrderedRing
 
 section StrictOrderedCommRing

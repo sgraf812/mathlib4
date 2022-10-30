@@ -2,6 +2,7 @@ import Std.Tactic.Simpa
 import Std.Tactic.Lint.Basic
 import Mathlib.Algebra.Order.Ring
 import Mathlib.Algebra.Order.Monoid.Lemmas
+import Mathlib.Init.Data.Int.Order
 
 namespace Linarith
 

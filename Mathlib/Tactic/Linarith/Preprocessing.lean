@@ -103,11 +103,11 @@ and similarly if `pf` proves a negated weak inequality.
 -/
 def mk_non_strict_int_pf_of_strict_int_pf (pf : Expr) : MetaM Expr := do
   match (← inferType pf).getAppFnArgs with
-  | (``LT.lt, #[_, _, _, _]) => return mkApp (← mkAppM ``Iff.mpr #[← mkAppOptM ``Int.add_one_le_iff #[none, none]]) pf
-  | (``GT.gt, #[_, _, _, _]) => return mkApp (← mkAppM ``Iff.mpr #[← mkAppOptM ``Int.add_one_le_iff #[none, none]]) pf
+  | (``LT.lt, #[_, _, a, b]) => return mkApp (← mkAppM ``Iff.mpr #[← mkAppOptM ``Int.add_one_le_iff #[a, b]]) pf
+  | (``GT.gt, #[_, _, a, b]) => return mkApp (← mkAppM ``Iff.mpr #[← mkAppOptM ``Int.add_one_le_iff #[a, b]]) pf
   | (``Not, #[P]) => match P.getAppFnArgs with
-    | (``LE.le, #[_, _, _, _]) => return mkApp (← mkAppM ``Iff.mpr #[← mkAppOptM ``Int.add_one_le_iff #[none, none]]) (← mkAppM `le_of_not_gt #[pf])
-    | (``GE.ge, #[_, _, _, _]) => return mkApp (← mkAppM ``Iff.mpr #[← mkAppOptM ``Int.add_one_le_iff #[none, none]]) (← mkAppM `le_of_not_gt #[pf])
+    | (``LE.le, #[_, _, a, b]) => return mkApp (← mkAppM ``Iff.mpr #[← mkAppOptM ``Int.add_one_le_iff #[a, b]]) (← mkAppM `le_of_not_gt #[pf])
+    | (``GE.ge, #[_, _, a, b]) => return mkApp (← mkAppM ``Iff.mpr #[← mkAppOptM ``Int.add_one_le_iff #[a, b]]) (← mkAppM `le_of_not_gt #[pf])
     | _ => throwError "mk_non_strict_int_pf_of_strict_int_pf failed: proof is not an inequality"
   | _ => throwError "mk_non_strict_int_pf_of_strict_int_pf failed: proof is not an inequality"
 

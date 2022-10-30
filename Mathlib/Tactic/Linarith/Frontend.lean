@@ -487,18 +487,27 @@ example [StrictOrderedCommSemiring α] : CommSemiring α := StrictOrderedCommSem
 
 example [LinearOrderedCommRing α] : CommSemiring α := inferInstance
 
+
+
+example [LinearOrderedCommRing α] : LinearOrderedRing α := LinearOrderedCommRing.toLinearOrderedRing
+example [LinearOrderedRing α] : StrictOrderedRing α := LinearOrderedRing.toStrictOrderedRing
+example [StrictOrderedRing α] : OrderedRing α := StrictOrderedRing.toOrderedRing
+
+example [LinearOrderedCommRing α] : OrderedRing α := inferInstance
+
+
 -- set_option pp.all true
 example [LinearOrderedCommRing α] {a b : α} (h : a < b) (w : b < a) : False := by
   linarith
 
 example : LinearOrder ℤ := inferInstance
 
-example : (3 : ℤ) < 7 := by
-  apply lt_of_not_ge
+example : LinearOrderedCommRing ℤ := inferInstance
+
+example : OrderedRing ℤ := inferInstance
 
 example (h : (1 : ℤ) < 0) (g : ¬ (37 : ℤ) < 42) (k : True) /-(l : (-7 : ℤ) < 5)-/: (3 : ℤ) < 7 := by
   linarith [(rfl : 0 = 0)]
-  all_goals admit
 
 example (h : 1 < 0) (g : ¬ 37 < 42) (k : True) /-(l : (-7 : ℤ) < 5)-/: 3 < 7 := by
   linarith [(rfl : 0 = 0)]
