@@ -75,15 +75,15 @@ If our goal is to add together two inequalities `t1 R1 0` and `t2 R2 0`,
 along with the name of a lemma to apply in order to conclude `t1 + t2 R 0`.
 -/
 def ineq_const_nm : Ineq → Ineq → (Name × Ineq)
-| eq, eq => (`eq_of_eq_of_eq, eq)
+| eq, eq => (``eq_of_eq_of_eq, eq)
 | eq, le => (``le_of_eq_of_le, le)
 | eq, lt => (``lt_of_eq_of_lt, lt)
 | le, eq => (``le_of_le_of_eq, le)
-| le, le => (`add_nonpos, le)
-| le, lt => (`add_lt_of_le_of_neg, lt)
+| le, le => (``add_nonpos, le)
+| le, lt => (``add_lt_of_le_of_neg, lt)
 | lt, eq => (``lt_of_lt_of_eq, lt)
-| lt, le => (`add_lt_of_neg_of_le, lt)
-| lt, lt => (`left.add_neg, lt)
+| lt, le => (``add_lt_of_neg_of_le, lt)
+| lt, lt => (``Left.add_neg, lt)
 
 /--
 `mk_lt_zero_pf_aux c pf npf coeff` assumes that `pf` is a proof of `t1 R1 0` and `npf` is a proof
@@ -139,6 +139,7 @@ def mk_neg_eq_zero_pf (e : Expr) : MetaM Expr := do
 def prove_eq_zero_using (tac : TacticM Unit) (e : Expr) : TermElabM Expr := do
   let ⟨u, α, e⟩ ← inferTypeQ' e
   let _h : Q(Zero $α) ← synthInstanceQ q(Zero $α)
+  -- FIXME remove try catch
   try
     synthesizeUsing q($e = 0) tac
   catch e => linarithTrace e.toMessageData; failure
@@ -159,6 +160,8 @@ def add_neg_eq_pfs : List Expr → MetaM (List Expr)
   | _ => return h :: (← add_neg_eq_pfs t)
 
 /-! #### The main method -/
+
+theorem lt_irrefl' {α : Type u} [Preorder α] {a : α} : ¬a < a := lt_irrefl a
 
 /--
 `proveFalseByLinarith` is the main workhorse of `linarith`.
@@ -210,20 +213,29 @@ def proveFalseByLinarith (cfg : LinarithConfig) : MVarId → List Expr → TermE
     let mls ← zip.mapM (fun ⟨e, n⟩ => do mulExpr n (← term_of_ineq_prf e))
     -- `sm` is the sum of input terms, scaled to cancel out all variables.
     let sm ← addExprs mls -- FIXME there was a to_expr here previously
-    let sm ← instantiateMVars sm
+    -- let sm ← instantiateMVars sm
     linarithTrace m!"The expression\n  {sm}\nshould be both 0 and negative"
     -- we prove that `sm = 0`, typically with `ring`.
     let sm_eq_zero ← prove_eq_zero_using cfg.discharger sm
-    linarithTrace "We have proved that it is zero"
-    -- we also prove that `sm < 0`.
-    let sm_lt_zero ← mk_lt_zero_pf zip
-    linarithTrace "We have proved that it is negative"
+    linarithTrace m!"We have proved that it is zero: {sm_eq_zero}"
+    -- we also prove that `sm < 0`
+    -- FIXME remove try catch
+    let sm_lt_zero ← try
+      mk_lt_zero_pf zip
+    catch e => linarithTrace e.toMessageData; failure
+    linarithTrace m!"We have proved that it is negative: {sm_lt_zero}"
     -- this is a contradiction.
     let pftp ← inferType sm_lt_zero
-    let ⟨_, nep, _⟩ ← g.rewrite sm_eq_zero pftp
+    linarithTrace pftp
+    let ⟨_, nep, _⟩ ← try
+      g.rewrite pftp sm_eq_zero
+    catch e => linarithTrace e.toMessageData; failure
+    linarithTrace nep
     let pf' ← mkAppM ``Eq.mp #[nep, sm_lt_zero]
-    mkAppM `lt_irrefl #[pf']
-
+    linarithTrace pf'
+    try
+      mkAppM ``lt_irrefl' #[pf']
+    catch e => linarithTrace e.toMessageData; failure
 
 axiom β : Type
 @[instance] axiom j : CommRing β

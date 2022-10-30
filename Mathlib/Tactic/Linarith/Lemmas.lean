@@ -1,8 +1,12 @@
 import Std.Tactic.Simpa
 import Std.Tactic.Lint.Basic
 import Mathlib.Algebra.Order.Ring
+import Mathlib.Algebra.Order.Monoid.Lemmas
 
 namespace Linarith
+
+theorem eq_of_eq_of_eq {α} [OrderedRing α] {a b : α} (ha : a = 0) (hb : b = 0) : a + b = 0 :=
+by simp [*]
 
 theorem mul_neg {α} [OrderedRing α] {a b : α} (ha : a < 0) (hb : 0 < b) : b * a < 0 :=
 sorry

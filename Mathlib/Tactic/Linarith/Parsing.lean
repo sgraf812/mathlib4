@@ -255,24 +255,24 @@ def linearFormsAndMaxVar (red : TransparencyMode) (pfs : List Expr) :
   let (l, _, map) ← toCompFold red [] pftps RBMap.empty
   return (l, map.size - 1)
 
-axiom α : Type
-@[instance] axiom i : OrderedRing α
-axiom a : α
-axiom b : α
+-- axiom α : Type
+-- @[instance] axiom i : OrderedRing α
+-- axiom a : α
+-- axiom b : α
 
-#eval linearFormsAndMaxVar .default []
-#eval linearFormsAndMaxVar .default [q((sorry : a + 2 * b = 0))]
-#eval linearFormsAndMaxVar .default [q((sorry : a + 2 * b + 3 * a + 4 * b = 0))]
-#eval linearFormsAndMaxVar .default [q((sorry : -b = 0))]
-#eval linearFormsAndMaxVar .default [q((sorry : -(a + b) = 0))]
-#eval linearFormsAndMaxVar .default [q((sorry : a - b = 0))]
-#eval linearFormsAndMaxVar .default [q((sorry : (a - b)^2 = 0))]
-#eval linearFormsAndMaxVar .default [q((sorry : (a - b)*(a+b) + (a+b)*(b - a) = 0))]
+-- #eval linearFormsAndMaxVar .default []
+-- #eval linearFormsAndMaxVar .default [q((sorry : a + 2 * b = 0))]
+-- #eval linearFormsAndMaxVar .default [q((sorry : a + 2 * b + 3 * a + 4 * b = 0))]
+-- #eval linearFormsAndMaxVar .default [q((sorry : -b = 0))]
+-- #eval linearFormsAndMaxVar .default [q((sorry : -(a + b) = 0))]
+-- #eval linearFormsAndMaxVar .default [q((sorry : a - b = 0))]
+-- #eval linearFormsAndMaxVar .default [q((sorry : (a - b)^2 = 0))]
+-- #eval linearFormsAndMaxVar .default [q((sorry : (a - b)*(a+b) + (a+b)*(b - a) = 0))]
 
-axiom h₁ : a + 2 * b = 0
-axiom h₂ : - b = 0
-axiom h₃ : a - b = 0
+-- axiom h₁ : a + 2 * b = 0
+-- axiom h₂ : - b = 0
+-- axiom h₃ : a - b = 0
 
-#eval linearFormsAndMaxVar .default [q(h₁), q(h₂)]
+-- #eval linearFormsAndMaxVar .default [q(h₁), q(h₂)]
 
 end Linarith

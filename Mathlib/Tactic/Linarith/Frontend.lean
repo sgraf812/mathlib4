@@ -195,6 +195,7 @@ Otherwise returns `none`.
 def apply_contr_lemma (g : MVarId) : MetaM (Option (Expr × Expr) × MVarId) := do
   match get_contr_lemma_name_and_type (← g.getType) with
   | some (nm, tp) => do
+      linarithTrace nm
       let [g] ← g.apply (← mkConst' nm) | failure
       let (f, g) ← g.intro1P
       return (some (tp, .fvar f), g)
@@ -457,11 +458,47 @@ set_option trace.linarith true
 
 open Function
 
+example [LinearOrderedCommRing α] : AddRightCancelSemigroup α := inferInstance
+example [LinearOrderedCommRing α] : PartialOrder α := inferInstance
+example [LinearOrderedCommRing α] : OrderedAddCommMonoid α := inferInstance -- OrderedSemiring.toOrderedAddCommMonoid α
+example [OrderedAddCommMonoid α] : CovariantClass α α (swap fun x x_1 => x + x_1) fun x x_1 => x ≤ x_1 := inferInstance --ordered_add_comm_monoid.to_covariant_class_right α
+
+example [AddRightCancelSemigroup α] [PartialOrder α] [CovariantClass α α (swap fun x x_1 => x + x_1) fun x x_1 => x ≤ x_1] : CovariantClass α α (swap fun x x_1 => x + x_1) fun x x_1 => x < x_1 :=
+AddRightCancelSemigroup.covariant_swap_add_lt_of_covariant_swap_add_le α
+
+example [LinearOrderedCommRing α] : CovariantClass α α (swap fun x x_1 => x + x_1) fun x x_1 => x < x_1 := inferInstance
+
+
+example [LinearOrderedCommRing α] : LinearOrderedRing α := LinearOrderedCommRing.toLinearOrderedRing
+example [LinearOrderedRing α] : StrictOrderedRing α := LinearOrderedRing.toStrictOrderedRing
+example [StrictOrderedRing α] : StrictOrderedSemiring α := StrictOrderedRing.toStrictOrderedSemiring
+example [StrictOrderedSemiring α] : OrderedSemiring α := StrictOrderedSemiring.toOrderedSemiring
+
+example [LinearOrderedCommRing α] : OrderedSemiring α := inferInstance
+example [LinearOrderedCommRing α] : Nontrivial α := inferInstance
+
+example [OrderedSemiring α] [Nontrivial α] : (0 : α) < 1 := zero_lt_one
+
+
+example [LinearOrderedCommRing α] : StrictOrderedCommRing α := LinearOrderedCommRing.toStrictOrderedCommRing
+example [StrictOrderedCommRing α] : StrictOrderedCommSemiring α := StrictOrderedCommRing.toStrictOrderedCommSemiring
+example [StrictOrderedCommSemiring α] : CommSemiring α := StrictOrderedCommSemiring.toCommSemiring
+
+
+example [LinearOrderedCommRing α] : CommSemiring α := inferInstance
+
 -- set_option pp.all true
-example [LinearOrderedCommRing α] [Nontrivial α] {a b : α} (h : a < b) (w : b < a) : False := by
+example [LinearOrderedCommRing α] {a b : α} (h : a < b) (w : b < a) : False := by
   linarith
 
-#exit
+example : LinearOrder ℤ := inferInstance
+
+example : (3 : ℤ) < 7 := by
+  apply lt_of_not_ge
+
+example (h : (1 : ℤ) < 0) (g : ¬ (37 : ℤ) < 42) (k : True) /-(l : (-7 : ℤ) < 5)-/: (3 : ℤ) < 7 := by
+  linarith [(rfl : 0 = 0)]
+  all_goals admit
 
 example (h : 1 < 0) (g : ¬ 37 < 42) (k : True) /-(l : (-7 : ℤ) < 5)-/: 3 < 7 := by
   linarith [(rfl : 0 = 0)]
