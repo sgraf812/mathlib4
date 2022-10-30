@@ -458,41 +458,10 @@ set_option trace.linarith true
 
 open Function
 
-example [LinearOrderedCommRing α] : AddRightCancelSemigroup α := inferInstance
-example [LinearOrderedCommRing α] : PartialOrder α := inferInstance
-example [LinearOrderedCommRing α] : OrderedAddCommMonoid α := inferInstance -- OrderedSemiring.toOrderedAddCommMonoid α
-example [OrderedAddCommMonoid α] : CovariantClass α α (swap fun x x_1 => x + x_1) fun x x_1 => x ≤ x_1 := inferInstance --ordered_add_comm_monoid.to_covariant_class_right α
-
-example [AddRightCancelSemigroup α] [PartialOrder α] [CovariantClass α α (swap fun x x_1 => x + x_1) fun x x_1 => x ≤ x_1] : CovariantClass α α (swap fun x x_1 => x + x_1) fun x x_1 => x < x_1 :=
-AddRightCancelSemigroup.covariant_swap_add_lt_of_covariant_swap_add_le α
-
-example [LinearOrderedCommRing α] : CovariantClass α α (swap fun x x_1 => x + x_1) fun x x_1 => x < x_1 := inferInstance
-
-
-example [LinearOrderedCommRing α] : LinearOrderedRing α := LinearOrderedCommRing.toLinearOrderedRing
-example [LinearOrderedRing α] : StrictOrderedRing α := LinearOrderedRing.toStrictOrderedRing
-example [StrictOrderedRing α] : StrictOrderedSemiring α := StrictOrderedRing.toStrictOrderedSemiring
-example [StrictOrderedSemiring α] : OrderedSemiring α := StrictOrderedSemiring.toOrderedSemiring
-
-example [LinearOrderedCommRing α] : OrderedSemiring α := inferInstance
-example [LinearOrderedCommRing α] : Nontrivial α := inferInstance
-
-example [OrderedSemiring α] [Nontrivial α] : (0 : α) < 1 := zero_lt_one
-
-
-example [LinearOrderedCommRing α] : StrictOrderedCommRing α := LinearOrderedCommRing.toStrictOrderedCommRing
-example [StrictOrderedCommRing α] : StrictOrderedCommSemiring α := StrictOrderedCommRing.toStrictOrderedCommSemiring
-example [StrictOrderedCommSemiring α] : CommSemiring α := StrictOrderedCommSemiring.toCommSemiring
-
-
+-- Tests that ensure typeclasses are being provided.
+example [LinearOrderedCommRing α] : CovariantClass α α (swap (· + ·)) (· < ·) := inferInstance
+example [LinearOrderedCommRing α] : (0 : α) < 1 := zero_lt_one
 example [LinearOrderedCommRing α] : CommSemiring α := inferInstance
-
-
-
-example [LinearOrderedCommRing α] : LinearOrderedRing α := LinearOrderedCommRing.toLinearOrderedRing
-example [LinearOrderedRing α] : StrictOrderedRing α := LinearOrderedRing.toStrictOrderedRing
-example [StrictOrderedRing α] : OrderedRing α := StrictOrderedRing.toOrderedRing
-
 example [LinearOrderedCommRing α] : OrderedRing α := inferInstance
 
 
@@ -506,7 +475,7 @@ example : LinearOrderedCommRing ℤ := inferInstance
 
 example : OrderedRing ℤ := inferInstance
 
-example (h : (1 : ℤ) < 0) (g : ¬ (37 : ℤ) < 42) (k : True) /-(l : (-7 : ℤ) < 5)-/: (3 : ℤ) < 7 := by
+example (h : (1 : ℤ) < 0) (g : ¬ (37 : ℤ) < 42) (_k : True) /-(l : (-7 : ℤ) < 5)-/: (3 : ℤ) < 7 := by
   linarith [(rfl : 0 = 0)]
 
 example (h : 1 < 0) (g : ¬ 37 < 42) (k : True) /-(l : (-7 : ℤ) < 5)-/: 3 < 7 := by
