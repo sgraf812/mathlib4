@@ -139,7 +139,9 @@ def mk_neg_eq_zero_pf (e : Expr) : MetaM Expr := do
 def prove_eq_zero_using (tac : TacticM Unit) (e : Expr) : TermElabM Expr := do
   let ⟨u, α, e⟩ ← inferTypeQ' e
   let _h : Q(Zero $α) ← synthInstanceQ q(Zero $α)
-  synthesizeUsing q($e = 0) tac
+  try
+    synthesizeUsing q($e = 0) tac
+  catch e => linarithTrace e.toMessageData; failure
 
 /--
 `add_neg_eq_pfs l` inspects the list of proofs `l` for proofs of the form `t = 0`. For each such
@@ -208,6 +210,7 @@ def proveFalseByLinarith (cfg : LinarithConfig) : MVarId → List Expr → TermE
     let mls ← zip.mapM (fun ⟨e, n⟩ => do mulExpr n (← term_of_ineq_prf e))
     -- `sm` is the sum of input terms, scaled to cancel out all variables.
     let sm ← addExprs mls -- FIXME there was a to_expr here previously
+    let sm ← instantiateMVars sm
     linarithTrace m!"The expression\n  {sm}\nshould be both 0 and negative"
     -- we prove that `sm = 0`, typically with `ring`.
     let sm_eq_zero ← prove_eq_zero_using cfg.discharger sm
@@ -225,6 +228,7 @@ def proveFalseByLinarith (cfg : LinarithConfig) : MVarId → List Expr → TermE
 axiom β : Type
 @[instance] axiom j : CommRing β
 axiom x : β
+axiom y : β
 
 example : x - x = 0 := by ring
 

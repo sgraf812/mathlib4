@@ -456,11 +456,11 @@ set_option trace.linarith true
 
 open Function
 
-example [OrderedRing α] [Nontrivial α] : (0 : α) < 1 := zero_lt_one
-
-example [OrderedRing α] [Nontrivial α] {a b : α} (h : a < b) (w : b < a) : False := by
-  -- apply eq_of_not_lt_of_not_gt
+set_option pp.all true
+example [LinearOrderedCommRing α] [Nontrivial α] {a b : α} (h : a < b) (w : b < a) : False := by
   linarith
+
+#exit
 
 example (h : 1 < 0) (g : ¬ 37 < 42) (k : True) /-(l : (-7 : ℤ) < 5)-/: 3 < 7 := by
   linarith [(rfl : 0 = 0)]
