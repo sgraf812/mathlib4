@@ -421,11 +421,6 @@ do
 open Parser Tactic
 open Syntax
 
-syntax (name := linarith) "linarith" (config)? (&" only")? (" [" term,* "]")? : tactic
-syntax (name := linarith!) "linarith!" (config)? (&" only")? (" [" term,* "]")? : tactic
-
-declare_config_elab elabLinarithConfig LinarithConfig
-
 /--
 Tries to prove a goal of `false` by linear arithmetic on hypotheses.
 If the goal is a linear (in)equality, tries to prove it by contradiction.
@@ -445,6 +440,12 @@ Config options:
   Options: `ring2`, `ring SOP`, `simp`
 * `linarith {split_hypotheses := ff}` will not destruct conjunctions in the context.
 -/
+syntax (name := linarith) "linarith" (config)? (&" only")? (" [" term,* "]")? : tactic
+@[inherit_doc linarith]
+syntax (name := linarith!) "linarith!" (config)? (&" only")? (" [" term,* "]")? : tactic
+
+declare_config_elab elabLinarithConfig LinarithConfig
+
 elab_rules : tactic
   | `(tactic| linarith $[$cfg]? $[only%$o]? $[[$args,*]]?) => do
     liftMetaTactic <|
@@ -456,7 +457,7 @@ set_option trace.linarith true
 
 open Function
 
-set_option pp.all true
+-- set_option pp.all true
 example [LinearOrderedCommRing α] [Nontrivial α] {a b : α} (h : a < b) (w : b < a) : False := by
   linarith
 
@@ -472,7 +473,6 @@ example (h : 1 < 0) : 3 = 7 := by
   all_goals admit
 
 -- TODO We have to repeat all that just to handle the `!`?
--- Copy doc-string?
 elab_rules : tactic
   | `(tactic| linarith! $[$cfg]? $[only%$o]? $[[$args,*]]?) => do
     liftMetaTactic <|

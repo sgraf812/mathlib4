@@ -29,9 +29,6 @@ section
 open Function
 -- These lemmas can be removed when their originals are ported.
 
-class Nontrivial (α : Type _) : Prop :=
-(exists_pair_ne : ∃ (x y : α), x ≠ y)
-
 theorem zero_lt_one [OrderedSemiring α] [Nontrivial α] : (0 : α) < 1 := sorry
 
 theorem lt_zero_of_zero_gt [Zero α] [LT α] {a : α} (h : 0 > a) : a < 0 := h
