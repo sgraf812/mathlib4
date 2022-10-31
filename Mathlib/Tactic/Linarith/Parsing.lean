@@ -231,7 +231,8 @@ def toComp (red : TransparencyMode) (e : Expr) (e_map : ExprMap) (monom_map : Ma
   let (m', comp') ← linearFormOfExpr red e_map e
   let ⟨nm, mm'⟩ := elimMonom comp' monom_map
   -- linarithTrace m!"mm' := {mm'.toList}"
-  return ⟨⟨iq, mm'.toList⟩, m', nm⟩
+  -- Note: we use `.reverse` as `Linexp.get` assumes the monomial are in descending order
+  return ⟨⟨iq, mm'.toList.reverse⟩, m', nm⟩
 
 /--
 `toCompFold red e_map exprs monom_map` folds `toComp` over `exprs`,

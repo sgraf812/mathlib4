@@ -2,9 +2,7 @@ import Mathlib.Tactic.Linarith
 
 set_option trace.linarith true
 
-example {α : Type} (_inst : (a : Prop) → Decidable a)
-  -- FIXME was LinearOrderedField
-    [LinearOrderedCommRing α]
+example {α : Type} (_inst : (a : Prop) → Decidable a) [LinearOrderedCommRing α]
     {a b c : α}
     (ha : a < 0)
     (hb : ¬b = 0)

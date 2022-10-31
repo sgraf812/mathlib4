@@ -54,13 +54,15 @@ def mulExpr (n : ℕ) (e : Expr) : MetaM Expr := do
   return mulExpr' n inst e
 
 /-- A type-safe analogue of `addExprs`. -/
-def addExprs' {α : Q(Type $u)} (inst : Q(AddMonoid $α)) : List Q($α) → Q($α)
+def addExprs' {α : Q(Type $u)} (_inst : Q(AddMonoid $α)) : List Q($α) → Q($α)
 | []   => q(0)
-| [a]  => a
-| h::t => let t := addExprs' inst t; q($h + $t)
+| h::t => go h t
+  where go (p : Q($α)) : List Q($α) → Q($α)
+  | [] => p
+  | [q] => q($p + $q)
+  | q::t => go q($p + $q) t
 
-/-- `addExprs L` creates an `Expr` representing the sum of the elements of `L`, associated right. -/
--- FIXME does it actually matter that we associate right? In mathlib3 we associate left.
+/-- `addExprs L` creates an `Expr` representing the sum of the elements of `L`, associated left. -/
 def addExprs : List Expr → MetaM Expr
 | [] => return q(0) -- This may not be of the intended type; use with caution.
 | L@(h::_) => do
