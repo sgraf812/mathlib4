@@ -130,8 +130,8 @@ def mk_neg_one_lt_zero_pf (tp : Expr) : MetaM Expr := do
 /--
 If `e` is a proof that `t = 0`, `mk_neg_eq_zero_pf e` returns a proof that `-t = 0`.
 -/
-def mk_neg_eq_zero_pf (e : Expr) : MetaM Expr := do
-  return mkAppN (← mkAppM `Iff.mpr #[mkConst `neg_eq_zero]) #[e]
+def mk_neg_eq_zero_pf (e t : Expr) : MetaM Expr := do
+  return mkAppN (← mkAppM `Iff.mpr #[← mkAppOptM ``neg_eq_zero #[none, none, t]]) #[e]
 
 /--
 `prove_eq_zero_using tac e` tries to use `tac` to construct a proof of `e = 0`.
@@ -150,14 +150,16 @@ proof, it adds a proof of `-t = 0` to the list.
 -/
 def add_neg_eq_pfs : List Expr → MetaM (List Expr)
 | [] => return []
-| (h::t) => do
-  let (iq, _) ← parseCompAndExpr (← inferType h)
+| (h::tl) => do
+  let (iq, t) ← parseCompAndExpr (← inferType h)
   match iq with
   | Ineq.eq => do
-    let nep ← mk_neg_eq_zero_pf h
-    let tl ← add_neg_eq_pfs t
+    -- linarithTrace m!"Found equation of the form `t = 0`: {h}"
+    let nep ← mk_neg_eq_zero_pf h t
+    -- linarithTrace m!"Consructed corresponding proof of `-t = 0`: {nep}"
+    let tl ← add_neg_eq_pfs tl
     return h::nep::tl
-  | _ => return h :: (← add_neg_eq_pfs t)
+  | _ => return h :: (← add_neg_eq_pfs tl)
 
 /-! #### The main method -/
 
@@ -198,13 +200,18 @@ def proveFalseByLinarith (cfg : LinarithConfig) : MVarId → List Expr → TermE
     let hz ← mk_neg_one_lt_zero_pf (← ineq_prf_tp h)
     let inputs := hz::l'
     linarithTraceProofs "mk_neg_one_lt_zero_pf" inputs
-    -- perform the elimination and fail if no contradiction is found.
-    let (comps, max_var) ← linearFormsAndMaxVar cfg.transparency inputs
+    let (comps, max_var) ← try
+      linearFormsAndMaxVar cfg.transparency inputs
+    catch e => linarithTrace m!"{e.toMessageData}"; throw e
     linarithTrace m!"comps {comps}"
     linarithTrace m!"max_var {max_var}"
     let oracle := cfg.oracle.getD FourierMotzkin.produceCertificate
-    let certificate : Std.HashMap Nat Nat ← oracle comps max_var
-      <|> throwError "linarith failed to find a contradiction"
+    -- perform the elimination and fail if no contradiction is found.
+    let certificate : Std.HashMap Nat Nat ← try
+      oracle comps max_var
+    catch e =>
+      linarithTrace m!"{e.toMessageData}"
+      throwError "linarith failed to find a contradiction"
     linarithTrace "linarith has found a contradiction"
     linarithTrace m!"{certificate.toList}"
     let enum_inputs := inputs.enum

@@ -73,7 +73,7 @@ def CompSource.toString : CompSource → String
 
 instance CompSource.ToFormat : ToFormat CompSource :=
   ⟨fun a => CompSource.toString a⟩
-#check Ordering
+
 /--
 A `PComp` stores a linear comparison `Σ cᵢ*xᵢ R 0`,
 along with information about how this comparison was derived.
@@ -182,6 +182,9 @@ def PComp.assump (c : Comp) (n : ℕ) : PComp :=
 instance PComp.ToFormat : ToFormat PComp :=
   ⟨fun p => format p.c.coeffs ++ toString p.c.str ++ "0"⟩
 
+instance PComp.ToString : ToString PComp :=
+  ⟨fun p => toString p.c.coeffs ++ toString p.c.str ++ "0"⟩
+
 abbrev PCompSet := RBSet PComp PComp.cmp
 
 /-! ### Elimination procedure -/
@@ -251,6 +254,8 @@ LinarithData.comps <$> get
 
 /-- Throws an exception if a contradictory `PComp` is contained in the current state. -/
 def validate : LinarithM Unit := do
+  let cs ← getPCompSet
+  dbg_trace ("validate: " ++ toString cs.toList)
   match (←getPCompSet).toList.find? (fun p : PComp => p.isContr) with
   | none => return ()
   | some c => throw c
@@ -288,7 +293,11 @@ def elimVarM (a : ℕ) : LinarithM Unit := do
   let vs ← getMaxVar
   if (a ≤ vs) then (do
     let ⟨pos, neg, notPresent⟩ ← splitSetByVarSign a <$> getPCompSet
+    dbg_trace ("elimVarM " ++ toString a ++ " (pos): " ++ toString pos.toList)
+    dbg_trace ("elimVarM " ++ toString a ++ " (neg): " ++ toString neg.toList)
+    dbg_trace ("elimVarM " ++ toString a ++ " (notPresent): " ++ toString notPresent.toList)
     let cs' := pos.foldl (fun s p => s.union (elimWithSet a p neg)) notPresent
+    dbg_trace ("elimVarM " ++ toString a ++ ": " ++ toString cs'.toList)
     update (vs - 1) cs')
   else
     pure ()

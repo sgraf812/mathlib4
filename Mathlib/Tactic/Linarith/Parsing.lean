@@ -32,8 +32,8 @@ This is ultimately converted into a `Linexp` in the obvious way.
 
 open Linarith.Ineq Std
 
-local instance [Add β] : Add (RBMap α β c) where
-  add := fun f g => f.mergeWith (fun _ b b' => b + b') g
+local instance [Add β] [Zero β] [DecidableEq β] : Add (RBMap α β c) where
+  add := fun f g => (f.mergeWith (fun _ b b' => b + b') g).filter (fun _ b => b ≠ 0)
 
 namespace Linarith
 
@@ -222,16 +222,19 @@ Both of these are updated during processing and returned.
 -/
 def toComp (red : TransparencyMode) (e : Expr) (e_map : ExprMap) (monom_map : Map Monom ℕ) :
     MetaM (Comp × ExprMap × Map Monom ℕ) := do
+  -- linarithTrace m!"toComp running on {e}"
   let (iq, e) ← parseCompAndExpr e
+  -- linarithTrace m!"(iq, e) := {(iq, e)}"
   -- TODO discard
   -- let ⟨u, α, e⟩ ← inferTypeQ' e
   -- let inst : Q(Add $α) ← synthInstanceQ q(Add $α)
   let (m', comp') ← linearFormOfExpr red e_map e
   let ⟨nm, mm'⟩ := elimMonom comp' monom_map
+  -- linarithTrace m!"mm' := {mm'.toList}"
   return ⟨⟨iq, mm'.toList⟩, m', nm⟩
 
 /--
-`toCompFold red e_map exprs monom_map` folds `to_comp` over `exprs`,
+`toCompFold red e_map exprs monom_map` folds `toComp` over `exprs`,
 updating `e_map` and `monom_map` as it goes.
  -/
 def toCompFold (red : TransparencyMode) : ExprMap → List Expr → Map Monom ℕ →
@@ -251,7 +254,9 @@ It also returns the largest variable index that appears in comparisons in `c`.
 -/
 def linearFormsAndMaxVar (red : TransparencyMode) (pfs : List Expr) :
     MetaM (List Comp × ℕ) := do
-  let pftps ← (pfs.mapM inferType).run'
+  -- linarithTrace m!"linearFormsAndMaxVar running on: {pfs}"
+  let pftps ← (pfs.mapM inferType)
+  -- linarithTrace m!"linearFormsAndMaxVar proofs types: {pftps}"
   let (l, _, map) ← toCompFold red [] pftps RBMap.empty
   return (l, map.size - 1)
 

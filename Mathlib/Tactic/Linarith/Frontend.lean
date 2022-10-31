@@ -478,14 +478,14 @@ example : OrderedRing ℤ := inferInstance
 example (h : (1 : ℤ) < 0) (g : ¬ (37 : ℤ) < 42) (_k : True) /-(l : (-7 : ℤ) < 5)-/: (3 : ℤ) < 7 := by
   linarith [(rfl : 0 = 0)]
 
-example (h : 1 < 0) (g : ¬ 37 < 42) (k : True) /-(l : (-7 : ℤ) < 5)-/: 3 < 7 := by
-  linarith [(rfl : 0 = 0)]
-  all_goals admit
+-- example (h : 1 < 0) (g : ¬ 37 < 42) (k : True) /-(l : (-7 : ℤ) < 5)-/: 3 < 7 := by
+--   linarith [(rfl : 0 = 0)]
+--   all_goals admit
 
 
-example (h : 1 < 0) : 3 = 7 := by
-  linarith [Int.zero_lt_one]
-  all_goals admit
+-- example (h : 1 < 0) : 3 = 7 := by
+--   linarith [Int.zero_lt_one]
+--   all_goals admit
 
 -- TODO We have to repeat all that just to handle the `!`?
 elab_rules : tactic

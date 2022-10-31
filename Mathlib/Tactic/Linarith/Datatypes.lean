@@ -362,7 +362,7 @@ def getRelSides (e : Expr) : MetaM (Expr × Expr) :=
   | (``Eq, #[_, a, b]) => return (a, b)
   | (``GE.ge, #[_, _, a, b]) => return (a, b)
   | (``GT.gt, #[_, _, a, b]) => return (a, b)
-  | _ => throwError "Not a comparison"
+  | _ => throwError "Not a comparison (getRelSides)"
 
 /--
 `parseCompAndExpr e` checks if `e` is of the form `t < 0`, `t ≤ 0`, or `t = 0`.

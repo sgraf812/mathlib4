@@ -33,7 +33,7 @@ open Qq
 /--
 If `prf` is a proof of `¬ e`, where `e` is a comparison,
 `rem_neg prf e` flips the comparison in `e` and returns a proof.
-For example, if `prf : ¬ a < b`, ``rem_neg prf `(a < b)`` returns a proof of `a ≥ b`.
+For example, if `prf : ¬ a < b`, ``rem_neg prf q(a < b)`` returns a proof of `a ≥ b`.
 -/
 def rem_neg (prf : Expr) (e : Expr) : MetaM Expr :=
   match e.getAppFnArgs with
@@ -41,7 +41,7 @@ def rem_neg (prf : Expr) (e : Expr) : MetaM Expr :=
   | (``LT.lt, #[_, _, _, _]) => mkAppM ``le_of_not_gt #[prf]
   | (``GT.gt, #[_, _, _, _]) => mkAppM ``le_of_not_gt #[prf]
   | (``GE.ge, #[_, _, _, _]) => mkAppM ``lt_of_not_ge #[prf]
-  | _ => throwError "Not a comparison"
+  | _ => throwError m!"Not a comparison (rem_neg): {e}"
 
 partial def rearr_comp_aux (proof e : Expr) : MetaM Expr :=
   match e.getAppFnArgs with
@@ -141,12 +141,10 @@ def is_strict_int_prop (e : Expr) : Bool :=
 
 partial def filter_comparisons_aux (e : Expr) : Bool :=
   match e.getAppFnArgs with
-  | (``Eq, _) => true
-  | (``LE.le, _) => true
-  | (``LT.lt, _) => true
-  | (``GE.ge, _) => true
-  | (``GT.gt, _) => true
-  | (``Not, #[e]) => filter_comparisons_aux e -- TODO hmm, this lets `¬ ¬ a ≤ b` through, but we probably can't handle that
+  | (``Eq, _) | (``LE.le, _) | (``LT.lt, _) | (``GE.ge, _) | (``GT.gt, _) => true
+  | (``Not, #[e]) => match e.getAppFnArgs with
+    | (``LE.le, _) | (``LT.lt, _) | (``GE.ge, _) | (``GT.gt, _) => true
+    | _ => false
   | _ => false
 
 /--
@@ -168,7 +166,9 @@ def remove_negations : Preprocessor :=
   transform := fun h => do
     let t : Q(Prop) ← inferType h
     match t with
-    | ~q(¬ $p) => return [← rem_neg h p]
+    | ~q(¬ $p) =>
+      linarithTrace m!"removing negation in {h}"
+      return [← rem_neg h p]
     | _        => return [h] }
 
 

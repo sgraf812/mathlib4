@@ -1,8 +1,10 @@
 import Mathlib.Tactic.Linarith
 
+set_option trace.linarith true
+
 example {α : Type} (_inst : (a : Prop) → Decidable a)
   -- FIXME was LinearOrderedField
-    [OrderedRing α]
+    [LinearOrderedCommRing α]
     {a b c : α}
     (ha : a < 0)
     (hb : ¬b = 0)
@@ -14,17 +16,20 @@ example {α : Type} (_inst : (a : Prop) → Decidable a)
     0 < 1 - a := by
   linarith
 
--- example (e b c a v0 v1 : ℚ) (h1 : v0 = 5*a) (h2 : v1 = 3*b) (h3 : v0 + v1 + c = 10) :
---   v0 + 5 + (v1 - 3) + (c - 2) = 10 :=
--- by linarith
+example (e b c a v0 v1 : Rat) (h1 : v0 = 5*a) (h2 : v1 = 3*b) (h3 : v0 + v1 + c = 10) :
+  v0 + 5 + (v1 - 3) + (c - 2) = 10 :=
+by linarith
 
--- example (u v r s t : ℚ) (h : 0 < u*(t*v + t*r + s)) : 0 < (t*(r + v) + s)*3*u :=
--- by linarith
+-- FIXME these next examples were over ℚ
+example [LinearOrderedCommRing α] (e b c a v0 v1 : α) (h1 : v0 = 5*a) (h2 : v1 = 3*b) (h3 : v0 + v1 + c = 10) :
+  v0 + 5 + (v1 - 3) + (c - 2) = 10 :=
+by linarith
 
--- example (A B : ℚ) (h : 0 < A * B) : 0 < 8*A*B :=
--- begin
---   linarith
--- end
+example [LinearOrderedCommRing α] (u v r s t : α) (h : 0 < u*(t*v + t*r + s)) : 0 < (t*(r + v) + s)*3*u :=
+by linarith
+
+example [LinearOrderedCommRing α] (A B : α) (h : 0 < A * B) : 0 < 8*A*B := by
+  linarith
 
 -- example (A B : ℚ) (h : 0 < A * B) : 0 < A*8*B :=
 -- begin
